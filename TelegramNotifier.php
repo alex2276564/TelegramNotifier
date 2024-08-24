@@ -57,28 +57,28 @@ class TelegramNotifier extends Module
         }
 
         $carrier = new Carrier($order->id_carrier);
-        $deliveryMethod = htmlspecialchars($carrier->name, ENT_QUOTES, 'UTF-8');
+        $deliveryMethod = $carrier->name;
 
         $productslist = '';
         $products = $order->getProducts();
 
         foreach ($products as $product) {
-            $attributes = isset($product['attributes']) ? htmlspecialchars($product['attributes'], ENT_QUOTES, 'UTF-8') : '';
-            $productName = htmlspecialchars($product['product_name'], ENT_QUOTES, 'UTF-8');
+            $attributes = isset($product['attributes']) ? $product['attributes'] : '';
+            $productName = $product['product_name'];
             $productslist .= "- " . $productName . " (" . $attributes . ") x " . (int) $product['product_quantity'] . "\n";
         }
 
         $messageTemplate = Configuration::get('TELEGRAMNOTIFY_MESSAGE_TEMPLATE');
         $message = strtr($messageTemplate, [
-            '{order_reference}' => htmlspecialchars($order->reference, ENT_QUOTES, 'UTF-8'),
+            '{order_reference}' => $order->reference, // System data, no shielding required
             '{customer_name}' => htmlspecialchars($customer->firstname . ' ' . $customer->lastname, ENT_QUOTES, 'UTF-8'),
             '{total_paid}' => number_format($order->getOrdersTotalPaid(), 2),
             '{products_list}' => $productslist,
             '{shipping_address}' => $this->formatShippingAddress($address),
             '{payment_method}' => htmlspecialchars($order->payment, ENT_QUOTES, 'UTF-8'),
             '{phone_number}' => htmlspecialchars($phoneNumber, ENT_QUOTES, 'UTF-8'),
-            '{order_comment}' => $orderMessage,
-            '{delivery_method}' => $deliveryMethod
+            '{order_comment}' => htmlspecialchars($orderMessage, ENT_QUOTES, 'UTF-8'),
+            '{delivery_method}' => htmlspecialchars($deliveryMethod, ENT_QUOTES, 'UTF-8')
         ]);
 
         $this->sendTelegramMessage($message);

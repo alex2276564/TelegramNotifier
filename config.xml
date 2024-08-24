@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<module>
+    <name>telegramnotifier</name>
+    <displayName><![CDATA[Telegram Order Notifier]]></displayName>
+    <version><![CDATA[1.0.0]]></version>
+    <description><![CDATA[Sends a Telegram notification when a new order is placed.]]></description>
+    <author><![CDATA[alex2276564]]></author>
+    <tab><![CDATA[administration]]></tab>
+    <is_configurable>1</is_configurable>
+    <need_instance>0</need_instance>
+    <author_uri>https://github.com/alex2276564/TelegramNotifier</author_uri>
+</module>

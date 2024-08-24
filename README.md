@@ -2,7 +2,7 @@
 
 ![PrestaShop](https://img.shields.io/badge/PrestaShop-1.7%20%7C%208.x-blue.svg)
 ![PHP](https://img.shields.io/badge/PHP-7.2%20%7C%207.3%20%7C%207.4%20%7C%208.0%20%7C%208.1-brightgreen.svg)
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.0.1-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 TelegramNotifier is a powerful PrestaShop module that sends instant notifications about new orders directly to your Telegram. Stay informed about every sale in real-time, right on your smartphone or computer!

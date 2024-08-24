@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <module>
-    <name>telegramnotifier</name>
+    <name>TelegramNotifier</name>
     <displayName><![CDATA[Telegram Order Notifier]]></displayName>
     <version><![CDATA[1.0.0]]></version>
     <description><![CDATA[Sends a Telegram notification when a new order is placed.]]></description>

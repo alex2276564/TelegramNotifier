@@ -97,7 +97,7 @@ class TelegramNotifier extends Module
         $chatIdsArray = explode(',', $chatIds);
         $success = true;
 
-        // Разделение сообщения на части, если оно превышает лимит
+        // Splitting a message into parts if it exceeds the limit
         $messageParts = $this->splitMessage($message);
 
         foreach ($chatIdsArray as $chatId) {
@@ -135,9 +135,9 @@ class TelegramNotifier extends Module
                 if ($result === false) {
                     $this->logError('Failed to send Telegram message part to chat ID ' . $chatId . ': ' . error_get_last()['message']);
                     $success = false;
-                    break;  // Прекращаем отправку частей, если произошла ошибка
+                    break;  // Stop sending parts if an error occurs
                 } else {
-                    // Добавляем задержку между отправками сообщений (rate limit)
+                    // Add delay between sending messages (rate limit)
                     sleep(1);
                 }
             }

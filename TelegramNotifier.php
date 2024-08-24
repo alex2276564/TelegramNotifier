@@ -52,7 +52,7 @@ class TelegramNotifier extends Module
         if ($order->id) {
             $orderMessages = Message::getMessagesByOrderId((int) $order->id);
             if (!empty($orderMessages)) {
-                $orderMessage = htmlspecialchars($orderMessages[0]['message'], ENT_QUOTES, 'UTF-8');
+                $orderMessage = $orderMessages[0]['message'];
             }
         }
 
@@ -70,15 +70,15 @@ class TelegramNotifier extends Module
 
         $messageTemplate = Configuration::get('TELEGRAMNOTIFY_MESSAGE_TEMPLATE');
         $message = strtr($messageTemplate, [
-            '{order_reference}' => $order->reference, // System data, no shielding required
-            '{customer_name}' => htmlspecialchars($customer->firstname . ' ' . $customer->lastname, ENT_QUOTES, 'UTF-8'),
-            '{total_paid}' => number_format($order->getOrdersTotalPaid(), 2),
+            '{order_reference}' => $order->reference,
+            '{customer_name}' => $customer->firstname . ' ' . $customer->lastname,
+            '{total_paid}' => $order->getOrdersTotalPaid(),
             '{products_list}' => $productslist,
             '{shipping_address}' => $this->formatShippingAddress($address),
-            '{payment_method}' => htmlspecialchars($order->payment, ENT_QUOTES, 'UTF-8'),
-            '{phone_number}' => htmlspecialchars($phoneNumber, ENT_QUOTES, 'UTF-8'),
-            '{order_comment}' => htmlspecialchars($orderMessage, ENT_QUOTES, 'UTF-8'),
-            '{delivery_method}' => htmlspecialchars($deliveryMethod, ENT_QUOTES, 'UTF-8')
+            '{payment_method}' => $order->payment,
+            '{phone_number}' => $phoneNumber,
+            '{order_comment}' => $orderMessage,
+            '{delivery_method}' => $deliveryMethod
         ]);
 
         $this->sendTelegramMessage($message);
@@ -276,15 +276,15 @@ class TelegramNotifier extends Module
     }
     private function formatShippingAddress($address)
     {
-        $formattedAddress = htmlspecialchars($address->address1, ENT_QUOTES, 'UTF-8');
+        $formattedAddress = $address->address1;
         if (!empty($address->address2)) {
-            $formattedAddress .= ", " . htmlspecialchars($address->address2, ENT_QUOTES, 'UTF-8');
+            $formattedAddress .= ", " . $address->address2;
         }
-        $formattedAddress .= "\n" . htmlspecialchars($address->postcode, ENT_QUOTES, 'UTF-8') . " " . htmlspecialchars($address->city, ENT_QUOTES, 'UTF-8');
+        $formattedAddress .= "\n" . $address->postcode . " " . $address->city;
         if (!empty($address->state)) {
-            $formattedAddress .= ", " . htmlspecialchars($address->state, ENT_QUOTES, 'UTF-8');
+            $formattedAddress .= ", " . $address->state;
         }
-        $formattedAddress .= "\n" . htmlspecialchars($address->country, ENT_QUOTES, 'UTF-8');
+        $formattedAddress .= "\n" . $address->country;
 
         return $formattedAddress;
     }

@@ -63,9 +63,9 @@ class TelegramNotifier extends Module
         $products = $order->getProducts();
 
         foreach ($products as $product) {
-            $attributes = isset($product['attributes']) ? $product['attributes'] : '';
+            $attributes = isset($product['attributes']) && !empty($product['attributes']) ? " (" . $product['attributes'] . ")" : "";
             $productName = $product['product_name'];
-            $productslist .= "- " . $productName . " (" . $attributes . ") x " . (int) $product['product_quantity'] . "\n";
+            $productslist .= "- " . $productName . $attributes . " x " . (int) $product['product_quantity'] . "\n";
         }
 
         $messageTemplate = Configuration::get('TELEGRAMNOTIFY_MESSAGE_TEMPLATE');

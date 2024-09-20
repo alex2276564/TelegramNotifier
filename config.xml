@@ -2,7 +2,7 @@
 <module>
     <name>TelegramNotifier</name>
     <displayName><![CDATA[Telegram Order Notifier]]></displayName>
-    <version><![CDATA[1.0.1]]></version>
+    <version><![CDATA[1.0.2]]></version>
     <description><![CDATA[Sends a Telegram notification when a new order is placed.]]></description>
     <author><![CDATA[alex2276564]]></author>
     <tab><![CDATA[administration]]></tab>

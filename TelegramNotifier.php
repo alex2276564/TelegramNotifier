@@ -97,7 +97,6 @@ class TelegramNotifier extends Module
         $chatIdsArray = explode(',', $chatIds);
         $success = true;
 
-        // Splitting a message into parts if it exceeds the limit
         $messageParts = $this->splitMessage($message);
 
         foreach ($chatIdsArray as $chatId) {
@@ -116,30 +115,31 @@ class TelegramNotifier extends Module
                     'text' => $part,
                 ];
 
-                $options = [
-                    'http' => [
-                        'method' => 'POST',
-                        'header' => "Content-Type: application/x-www-form-urlencoded\r\n",
-                        'content' => http_build_query($data),
-                        'timeout' => 10,
-                    ],
-                    'ssl' => [
-                        'verify_peer' => true,
-                        'verify_peer_name' => true,
-                    ],
-                ];
+                $ch = curl_init();
+                curl_setopt($ch, CURLOPT_URL, $url);
+                curl_setopt($ch, CURLOPT_POST, 1);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 10);
 
-                $context = stream_context_create($options);
-                $result = @file_get_contents($url, false, $context);
+                $result = curl_exec($ch);
 
                 if ($result === false) {
-                    $this->logError('Failed to send Telegram message part to chat ID ' . $chatId . ': ' . error_get_last()['message']);
+                    $this->logError('Failed to send Telegram message part to chat ID ' . $chatId . ': ' . curl_error($ch));
                     $success = false;
-                    break;  // Stop sending parts if an error occurs
-                } else {
-                    // Add delay between sending messages (rate limit)
-                    sleep(1);
+                    curl_close($ch);
+                    break;
                 }
+
+                $response = json_decode($result, true);
+                if (!isset($response['ok']) || $response['ok'] !== true) {
+                    $this->logError('Telegram API error: ' . ($response['description'] ?? 'Unknown error'));
+                    $success = false;
+                }
+
+                curl_close($ch);
+                sleep(1);  // Rate limiting
             }
         }
 

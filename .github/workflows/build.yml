@@ -8,13 +8,17 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-      - name: Create archive
-        run: zip -r TelegramNotifier.zip TelegramNotifier/ *
+      - name: Create directory
+        run: mkdir TelegramNotifier
+
+      - name: Move files
+        run: mv LICENSE README.md TelegramNotifier.php config.xml index.php logo.png TelegramNotifier
+
+      - name: Create ZIP archive
+        run: zip -r TelegramNotifier.zip TelegramNotifier
 
       - name: Upload artifact
         uses: actions/upload-artifact@v3

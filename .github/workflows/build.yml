@@ -17,9 +17,6 @@ jobs:
       - name: Move files
         run: mv LICENSE README.md TelegramNotifier.php config.xml index.php logo.png TelegramNotifier
 
-      - name: Create ZIP archive
-        run: zip -r TelegramNotifier.zip TelegramNotifier
-
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:

@@ -1,0 +1,27 @@
+name: Build TelegramNotifier
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Create directory
+        run: mkdir TelegramNotifier
+
+      - name: Move files
+        run: mv LICENSE README.md TelegramNotifier.php config.xml index.php logo.png TelegramNotifier
+
+      - name: Create ZIP archive
+        run: zip -r TelegramNotifier.zip TelegramNotifier
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: TelegramNotifier
+          path: TelegramNotifier.zip

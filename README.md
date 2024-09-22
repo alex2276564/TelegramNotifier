@@ -1,4 +1,4 @@
-# TelegramNotifier for PrestaShop
+# TelegramNotifier for PrestaShop 🛍️📱
 
 ![PrestaShop](https://img.shields.io/badge/PrestaShop-1.7%20%7C%208.x-blue.svg)
 ![PHP](https://img.shields.io/badge/PHP-7.2%20%7C%207.3%20%7C%207.4%20%7C%208.0%20%7C%208.1-brightgreen.svg)
@@ -73,3 +73,7 @@ Contributions, issues, and feature requests are welcome! Feel free to check the 
 3. Commit your changes (`git commit -m 'Add some feature'`).
 4. Push to the branch (`git push origin feature/YourFeature`).
 5. Open a Pull Request.
+
+---
+
+Thank you for using **TelegramNotifier for PrestaShop**! We hope it helps you stay on top of your e-commerce business. 🚀📊

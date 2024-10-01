@@ -115,30 +115,20 @@ class TelegramNotifier extends Module
                     'text' => $part,
                 ];
 
-                $ch = curl_init();
-                curl_setopt($ch, CURLOPT_URL, $url);
-                curl_setopt($ch, CURLOPT_POST, 1);
-                curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
-                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-                curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+                $response = $this->executeCurlRequest($url, $data);
 
-                $result = curl_exec($ch);
-
-                if ($result === false) {
-                    $this->logError('Failed to send Telegram message part to chat ID ' . $chatId . ': ' . curl_error($ch));
+                if ($response['error']) {
+                    $this->logError('Failed to send Telegram message part to chat ID ' . $chatId . ': ' . $response['error']);
                     $success = false;
-                    curl_close($ch);
                     break;
                 }
 
-                $response = json_decode($result, true);
-                if (!isset($response['ok']) || $response['ok'] !== true) {
-                    $this->logError('Telegram API error: ' . ($response['description'] ?? 'Unknown error'));
+                $responseData = json_decode($response['result'], true);
+                if (!isset($responseData['ok']) || $responseData['ok'] !== true) {
+                    $this->logError('Telegram API error: ' . ($responseData['description'] ?? 'Unknown error'));
                     $success = false;
                 }
 
-                curl_close($ch);
                 sleep(1);  // Rate limiting
             }
         }
@@ -172,6 +162,35 @@ class TelegramNotifier extends Module
         }
 
         return $parts;
+    }
+
+    private function executeCurlRequest($url, $postData = null, $headers = [])
+    {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+
+        if (!empty($headers)) {
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        }
+
+        if ($postData !== null) {
+            curl_setopt($ch, CURLOPT_POST, 1);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postData));
+        }
+
+        $result = curl_exec($ch);
+        $error = curl_error($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        return [
+            'result' => $result,
+            'error' => $error,
+            'httpCode' => $httpCode
+        ];
     }
 
     public function getContent()
@@ -329,17 +348,23 @@ class TelegramNotifier extends Module
     private function checkForUpdates()
     {
         $url = "https://api.github.com/repos/alex2276564/TelegramNotifier/releases/latest";
-        $opts = [
-            "http" => [
-                "method" => "GET",
-                "header" => "User-Agent: php",
-            ],
-        ];
-        $context = stream_context_create($opts);
-        $result = file_get_contents($url, false, $context);
-        $release = json_decode($result, true);
+        $headers = ["User-Agent: php"];
 
-        if (version_compare($release['tag_name'], $this->version, '>')) {
+        $response = $this->executeCurlRequest($url, null, $headers);
+
+        if ($response['error']) {
+            $this->logError('Failed to check for updates: ' . $response['error']);
+            return false;
+        }
+
+        if ($response['httpCode'] != 200) {
+            $this->logError('Failed to check for updates: HTTP code ' . $response['httpCode']);
+            return false;
+        }
+
+        $release = json_decode($response['result'], true);
+
+        if (isset($release['tag_name']) && version_compare($release['tag_name'], $this->version, '>')) {
             return $release['tag_name'];
         }
 

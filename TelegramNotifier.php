@@ -48,6 +48,8 @@ class TelegramNotifier extends Module
 
         $phoneNumber = !empty($address->phone_mobile) ? $address->phone_mobile : $address->phone;
 
+        $customerEmail = $customer->email;
+
         $orderMessage = '';
         if ($order->id) {
             $orderMessages = Message::getMessagesByOrderId((int) $order->id);
@@ -72,6 +74,7 @@ class TelegramNotifier extends Module
         $message = strtr($messageTemplate, [
             '{order_reference}' => $order->reference,
             '{customer_name}' => $customer->firstname . ' ' . $customer->lastname,
+            '{customer_email}' => $customerEmail,
             '{total_paid}' => $order->getOrdersTotalPaid(),
             '{products_list}' => $productslist,
             '{shipping_address}' => $this->formatShippingAddress($address),
@@ -257,7 +260,7 @@ class TelegramNotifier extends Module
                     'cols' => 60,
                     'rows' => 10,
                     'required' => true,
-                    'desc' => $this->l('Available placeholders: {order_reference}, {customer_name}, {total_paid}, {products_list}, {shipping_address}, {payment_method}, {phone_number}, {order_comment}, {delivery_method}')
+                    'desc' => $this->l('Available placeholders: {order_reference}, {customer_name}, {customer_email}, {total_paid}, {products_list}, {shipping_address}, {payment_method}, {phone_number}, {order_comment}, {delivery_method}')
                 ]
             ],
             'submit' => [
@@ -324,6 +327,7 @@ class TelegramNotifier extends Module
     {
         return "🆕 New order #{order_reference}\n" .
             "👤 Customer: {customer_name}\n" .
+            "📧 Email: {customer_email}\n" .
             "📞 Phone: {phone_number}\n" .
             "💰 Amount: {total_paid}\n" .
             "🛍️ Products:\n{products_list}\n" .

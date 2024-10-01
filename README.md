@@ -38,6 +38,7 @@ TelegramNotifier is a powerful PrestaShop module that sends instant notification
    Customize the notification message using available placeholders:
    - `{order_reference}`: The unique order reference
    - `{customer_name}`: Name of the customer
+   - `{customer_email}`: Email address of the customer
    - `{total_paid}`: Total amount paid for the order
    - `{products_list}`: List of products in the order
    - `{shipping_address}`: Delivery address

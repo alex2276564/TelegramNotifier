@@ -1,7 +1,7 @@
 # TelegramNotifier for PrestaShop 🛍️📱
 
 ![PrestaShop](https://img.shields.io/badge/PrestaShop-1.7%20%7C%208.x-blue.svg)
-![PHP](https://img.shields.io/badge/PHP-7.2%20%7C%207.3%20%7C%207.4%20%7C%208.0%20%7C%208.1-brightgreen.svg)
+![PHP](https://img.shields.io/badge/PHP-7.2%20%7C%207.3%20%7C%207.4%20%7C%208.0%20%7C%208.1-8892BF.svg?style=flat-square)
 ![Version](https://img.shields.io/github/v/release/alex2276564/TelegramNotifier?color=blue)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
@@ -36,16 +36,23 @@ TelegramNotifier is a powerful PrestaShop module that sends instant notification
 
 3. **Message Template**:
    Customize the notification message using available placeholders:
-   - `{order_reference}`: The unique order reference
-   - `{customer_name}`: Name of the customer
-   - `{customer_email}`: Email address of the customer
-   - `{total_paid}`: Total amount paid for the order
-   - `{products_list}`: List of products in the order
-   - `{shipping_address}`: Delivery address
-   - `{payment_method}`: Method of payment used
-   - `{phone_number}`: Customer's phone number
-   - `{order_comment}`: Any comment left by the customer
-   - `{delivery_method}`: Chosen delivery method
+   - `{order_reference}`: The unique order reference 📦
+   - `{customer_name}`: Name of the customer 👤
+   - `{customer_email}`: Email address of the customer 📧
+   - `{phone_number}`: Customer's phone number 📞
+   - `{total_paid}`: Total amount paid for the order 💰
+   - `{shipping_address}`: Delivery address 🏠
+   - `{delivery_method}`: Chosen delivery method 🚚
+   - `{payment_method}`: Method of payment used 💳
+   - `{products_list}`: List of products in the order 🛍️
+   - `{order_comment}`: Any comment left by the customer 📝
+
+4. **Max Messages per Order**:
+   - This setting allows you to control the maximum number of messages sent per order.
+   - In most cases, you don't need to change this value.
+   - If your store has many chat IDs and frequent simultaneous orders, it's recommended to lower this value to 2. This will ensure that messages are sent more efficiently, but they may not be fully detailed.
+   - All messages will be sent 100% but not fully detailed if you decrease this value.
+   - Set this value to 0 for unlimited messages per order.
 
 4. Save your settings and use the "Test Message" button to verify the configuration.
 

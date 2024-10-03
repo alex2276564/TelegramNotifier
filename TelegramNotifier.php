@@ -29,7 +29,8 @@ class TelegramNotifier extends Module
             $this->registerHook('actionValidateOrder') &&
             Configuration::updateValue('TELEGRAMNOTIFY_BOT_TOKEN', '') &&
             Configuration::updateValue('TELEGRAMNOTIFY_CHAT_ID', '') &&
-            Configuration::updateValue('TELEGRAMNOTIFY_MESSAGE_TEMPLATE', $this->getDefaultMessageTemplate());
+            Configuration::updateValue('TELEGRAMNOTIFY_MESSAGE_TEMPLATE', $this->getDefaultMessageTemplate()) &&
+            Configuration::updateValue('TELEGRAMNOTIFY_MAX_MESSAGES', 5);
     }
 
     public function uninstall()
@@ -37,7 +38,8 @@ class TelegramNotifier extends Module
         return parent::uninstall() &&
             Configuration::deleteByName('TELEGRAMNOTIFY_BOT_TOKEN') &&
             Configuration::deleteByName('TELEGRAMNOTIFY_CHAT_ID') &&
-            Configuration::deleteByName('TELEGRAMNOTIFY_MESSAGE_TEMPLATE');
+            Configuration::deleteByName('TELEGRAMNOTIFY_MESSAGE_TEMPLATE') &&
+            Configuration::deleteByName('TELEGRAMNOTIFY_MAX_MESSAGES');
     }
 
     public function hookActionValidateOrder($params)
@@ -75,13 +77,13 @@ class TelegramNotifier extends Module
             '{order_reference}' => $order->reference,
             '{customer_name}' => $customer->firstname . ' ' . $customer->lastname,
             '{customer_email}' => $customerEmail,
-            '{total_paid}' => $order->getOrdersTotalPaid(),
-            '{products_list}' => $productslist,
-            '{shipping_address}' => $this->formatShippingAddress($address),
-            '{payment_method}' => $order->payment,
             '{phone_number}' => $phoneNumber,
+            '{total_paid}' => $order->getOrdersTotalPaid(),
+            '{shipping_address}' => $this->formatShippingAddress($address),
+            '{delivery_method}' => $deliveryMethod,
+            '{payment_method}' => $order->payment,
+            '{products_list}' => $productslist,
             '{order_comment}' => $orderMessage,
-            '{delivery_method}' => $deliveryMethod
         ]);
 
         $this->sendTelegramMessage($message);
@@ -91,6 +93,7 @@ class TelegramNotifier extends Module
     {
         $botToken = Configuration::get('TELEGRAMNOTIFY_BOT_TOKEN');
         $chatIds = Configuration::get('TELEGRAMNOTIFY_CHAT_ID');
+        $maxMessages = (int) Configuration::get('TELEGRAMNOTIFY_MAX_MESSAGES');
 
         if (empty($botToken) || empty($chatIds)) {
             $this->logError('Bot Token or Chat ID is empty');
@@ -99,6 +102,10 @@ class TelegramNotifier extends Module
 
         $chatIdsArray = array_map('trim', explode(',', $chatIds));
         $messageParts = $this->splitMessage($message);
+
+        if ($maxMessages > 0) {
+            $messageParts = array_slice($messageParts, 0, $maxMessages);
+        }
 
         $urls = [];
         $postData = [];
@@ -260,13 +267,17 @@ class TelegramNotifier extends Module
             $botToken = Tools::getValue('TELEGRAMNOTIFY_BOT_TOKEN');
             $chatId = Tools::getValue('TELEGRAMNOTIFY_CHAT_ID');
             $messageTemplate = Tools::getValue('TELEGRAMNOTIFY_MESSAGE_TEMPLATE');
+            $maxMessages = Tools::getValue('TELEGRAMNOTIFY_MAX_MESSAGES');
 
             if (empty($botToken) || empty($chatId)) {
-                $output .= $this->displayError($this->l('Bot Token and Chat ID are required.'));
+                $output .= $this->displayError($this->l('Bot Token or Chat ID are required.'));
+            } elseif (!is_numeric($maxMessages) || $maxMessages < 0) {
+                $output .= $this->displayError($this->l('Max Messages must be a non-negative number.'));
             } else {
                 Configuration::updateValue('TELEGRAMNOTIFY_BOT_TOKEN', $botToken);
                 Configuration::updateValue('TELEGRAMNOTIFY_CHAT_ID', $chatId);
                 Configuration::updateValue('TELEGRAMNOTIFY_MESSAGE_TEMPLATE', $messageTemplate);
+                Configuration::updateValue('TELEGRAMNOTIFY_MAX_MESSAGES', $maxMessages);
                 $output .= $this->displayConfirmation($this->l('Settings updated'));
             }
         }
@@ -301,7 +312,7 @@ class TelegramNotifier extends Module
                     'name' => 'TELEGRAMNOTIFY_CHAT_ID',
                     'size' => 50,
                     'required' => true,
-                    'desc' => $this->l('Enter one or more Chat IDs separated by commas. To get a Chat ID, send a message to your bot and visit the URL: https://api.telegram.org/bot<YourBOTToken>/getUpdates')
+                    'desc' => $this->l('Enter one or more Chat IDs separated by commas. To get a Chat ID, send a message to your bot and visit the URL: https://api.telegram.org/bot<YourBOTToken>/getUpdates.')
                 ],
                 [
                     'type' => 'textarea',
@@ -310,7 +321,15 @@ class TelegramNotifier extends Module
                     'cols' => 60,
                     'rows' => 10,
                     'required' => true,
-                    'desc' => $this->l('Available placeholders: {order_reference}, {customer_name}, {customer_email}, {total_paid}, {products_list}, {shipping_address}, {payment_method}, {phone_number}, {order_comment}, {delivery_method}')
+                    'desc' => $this->l('Available placeholders: {order_reference}, {customer_name}, {customer_email}, {total_paid}, {products_list}, {shipping_address}, {payment_method}, {phone_number}, {order_comment}, {delivery_method}.')
+                ],
+                [
+                    'type' => 'text',
+                    'label' => $this->l('Max Messages per Order'),
+                    'name' => 'TELEGRAMNOTIFY_MAX_MESSAGES',
+                    'size' => 5,
+                    'required' => true,
+                    'desc' => $this->l('Enter the maximum number of messages to send per order (0 for unlimited).')
                 ]
             ],
             'submit' => [
@@ -343,6 +362,7 @@ class TelegramNotifier extends Module
         $helper->fields_value['TELEGRAMNOTIFY_BOT_TOKEN'] = Configuration::get('TELEGRAMNOTIFY_BOT_TOKEN');
         $helper->fields_value['TELEGRAMNOTIFY_CHAT_ID'] = Configuration::get('TELEGRAMNOTIFY_CHAT_ID');
         $helper->fields_value['TELEGRAMNOTIFY_MESSAGE_TEMPLATE'] = Configuration::get('TELEGRAMNOTIFY_MESSAGE_TEMPLATE');
+        $helper->fields_value['TELEGRAMNOTIFY_MAX_MESSAGES'] = Configuration::get('TELEGRAMNOTIFY_MAX_MESSAGES');
 
         return $helper->generateForm($fields_form);
     }
@@ -375,18 +395,18 @@ class TelegramNotifier extends Module
     }
 
     private function getDefaultMessageTemplate()
-    {
-        return "🆕 New order #{order_reference}\n" .
-            "👤 Customer: {customer_name}\n" .
-            "📧 Email: {customer_email}\n" .
-            "📞 Phone: {phone_number}\n" .
-            "💰 Amount: {total_paid}\n" .
-            "🛍️ Products:\n{products_list}\n" .
-            "🏠 Shipping address:\n{shipping_address}\n" .
-            "📦 Delivery method: {delivery_method}\n" .
-            "💳 Payment method: {payment_method}\n" .
-            "📝 Comment: {order_comment}";
-    }
+{
+    return "🆕 New order #{order_reference}\n" .
+        "👤 Customer: {customer_name}\n" .
+        "📧 Email: {customer_email}\n" .
+        "📞 Phone: {phone_number}\n" .
+        "💰 Amount: {total_paid}\n" .
+        "🏠 Shipping address:\n{shipping_address}\n" .
+        "📦 Delivery method: {delivery_method}\n" .
+        "💳 Payment method: {payment_method}\n" .
+        "🛍️ Products:\n{products_list}\n" .
+        "📝 Comment: {order_comment}";
+}
 
     public function testTelegramMessage()
     {

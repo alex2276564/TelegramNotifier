@@ -50,7 +50,7 @@ TelegramNotifier is a powerful PrestaShop module that sends instant notification
 4. **Max Messages per Order**:
    - This setting allows you to control the maximum number of messages sent per order.
    - In most cases, you don't need to change this value.
-   - If your store has many chat IDs and frequent simultaneous orders, it's recommended to lower this value to 2. This will ensure that messages are sent more efficiently, but they may not be fully detailed.
+   - If your store frequently receives many simultaneous orders, it's recommended to reduce this value to 2. This will ensure more efficient message delivery, but the messages may be less detailed.
    - All messages will be sent 100% but not fully detailed if you decrease this value.
    - Set this value to 0 for unlimited messages per order.
 

@@ -139,6 +139,13 @@ class TelegramNotifier extends Module
         return $success;
     }
 
+    /**
+     * Splits a message into parts if its length exceeds the maximum allowed length.
+     *
+     * @param string $message The original message.
+     * @param int $maxLength The maximum length of one part of the message (default is 4096 characters).
+     * @return array An array of message parts.
+     */
     private function splitMessage($message, $maxLength = 4096)
     {
         if (mb_strlen($message, 'UTF-8') <= $maxLength) {
@@ -200,7 +207,6 @@ class TelegramNotifier extends Module
     {
         $output = '';
 
-        // Check for updates
         $newVersion = $this->checkForUpdates();
         if ($newVersion) {
             $output .= $this->displayConfirmation($this->l('A new version ' . $newVersion . ' is available. Please update the module.'));
@@ -296,6 +302,7 @@ class TelegramNotifier extends Module
 
         return $helper->generateForm($fields_form);
     }
+
     private function formatShippingAddress($address)
     {
         $formattedAddress = $address->address1;

@@ -9,7 +9,7 @@ class TelegramNotifier extends Module
     {
         $this->name = 'TelegramNotifier';
         $this->tab = 'administration';
-        $this->version = '1.0.2';
+        $this->version = '1.0.3';
         $this->author = 'alex2276564';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array('min' => '1.7.0.0', 'max' => _PS_VERSION_);
@@ -395,18 +395,18 @@ class TelegramNotifier extends Module
     }
 
     private function getDefaultMessageTemplate()
-{
-    return "🆕 New order #{order_reference}\n" .
-        "👤 Customer: {customer_name}\n" .
-        "📧 Email: {customer_email}\n" .
-        "📞 Phone: {phone_number}\n" .
-        "💰 Amount: {total_paid}\n" .
-        "🏠 Shipping address:\n{shipping_address}\n" .
-        "📦 Delivery method: {delivery_method}\n" .
-        "💳 Payment method: {payment_method}\n" .
-        "🛍️ Products:\n{products_list}\n" .
-        "📝 Comment: {order_comment}";
-}
+    {
+        return "🆕 New order #{order_reference}\n" .
+            "👤 Customer: {customer_name}\n" .
+            "📧 Email: {customer_email}\n" .
+            "📞 Phone: {phone_number}\n" .
+            "💰 Amount: {total_paid}\n" .
+            "🏠 Shipping address:\n{shipping_address}\n" .
+            "📦 Delivery method: {delivery_method}\n" .
+            "💳 Payment method: {payment_method}\n" .
+            "🛍️ Products:\n{products_list}\n" .
+            "📝 Comment: {order_comment}";
+    }
 
     public function testTelegramMessage()
     {

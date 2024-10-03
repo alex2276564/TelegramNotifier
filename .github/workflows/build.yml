@@ -24,7 +24,7 @@ jobs:
         run: zip -r TelegramNotifier.zip TelegramNotifier
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: TelegramNotifier
           path: TelegramNotifier.zip

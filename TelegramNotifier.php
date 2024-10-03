@@ -97,55 +97,55 @@ class TelegramNotifier extends Module
             return false;
         }
 
-        $chatIdsArray = explode(',', $chatIds);
-        $success = true;
-
+        $chatIdsArray = array_map('trim', explode(',', $chatIds));
         $messageParts = $this->splitMessage($message);
 
-        foreach ($chatIdsArray as $chatId) {
-            $chatId = trim($chatId);
+        $urls = [];
+        $postData = [];
 
+        foreach ($chatIdsArray as $chatId) {
             if (!ctype_digit($chatId) || strlen($chatId) < 9 || strlen($chatId) > 10) {
                 $this->logError('Invalid Chat ID: ' . $chatId);
-                $success = false;
                 continue;
             }
 
             foreach ($messageParts as $part) {
-                $url = "https://api.telegram.org/bot" . urlencode($botToken) . "/sendMessage";
-                $data = [
+                $urls[] = "https://api.telegram.org/bot" . urlencode($botToken) . "/sendMessage";
+                $postData[] = [
                     'chat_id' => $chatId,
                     'text' => $part,
                 ];
+            }
+        }
 
-                $response = $this->executeCurlRequest($url, $data);
+        if (empty($urls)) {
+            $this->logError('No valid Chat IDs found');
+            return false;
+        }
 
-                if ($response['error']) {
-                    $this->logError('Failed to send Telegram message part to chat ID ' . $chatId . ': ' . $response['error']);
-                    $success = false;
-                    break;
-                }
+        $results = $this->executeCurlRequest($urls, $postData, [], true);
 
-                $responseData = json_decode($response['result'], true);
+        $success = true;
+        foreach ($results as $index => $result) {
+            if ($result['error']) {
+                $this->logError('Failed to send Telegram message: ' . $result['error']);
+                $success = false;
+            } else {
+                $responseData = json_decode($result['result'], true);
                 if (!isset($responseData['ok']) || $responseData['ok'] !== true) {
                     $this->logError('Telegram API error: ' . ($responseData['description'] ?? 'Unknown error'));
                     $success = false;
                 }
-
-                sleep(1);  // Rate limiting
             }
+
+            // Telegram rate limiting (add a delay (1 second) between messages)
+            sleep(1);
         }
 
         return $success;
     }
 
-    /**
-     * Splits a message into parts if its length exceeds the maximum allowed length.
-     *
-     * @param string $message The original message.
-     * @param int $maxLength The maximum length of one part of the message (default is 4096 characters).
-     * @return array An array of message parts.
-     */
+    //Splits a message into parts if its length exceeds the maximum allowed length
     private function splitMessage($message, $maxLength = 4096)
     {
         if (mb_strlen($message, 'UTF-8') <= $maxLength) {
@@ -174,33 +174,77 @@ class TelegramNotifier extends Module
         return $parts;
     }
 
-    private function executeCurlRequest($url, $postData = null, $headers = [])
+    private function executeCurlRequest($urls, $postData = null, $headers = [], $multiRequest = false)
     {
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        if (!$multiRequest) {
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $urls);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
 
-        if (!empty($headers)) {
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            if (!empty($headers)) {
+                curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            }
+
+            if ($postData !== null) {
+                curl_setopt($ch, CURLOPT_POST, 1);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postData));
+            }
+
+            $result = curl_exec($ch);
+            $error = curl_error($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            return [
+                'result' => $result,
+                'error' => $error,
+                'httpCode' => $httpCode
+            ];
         }
 
-        if ($postData !== null) {
-            curl_setopt($ch, CURLOPT_POST, 1);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postData));
+        $mh = curl_multi_init();
+        $curlHandles = [];
+
+        foreach ($urls as $index => $url) {
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+
+            if (!empty($headers)) {
+                curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            }
+
+            if ($postData !== null && isset($postData[$index])) {
+                curl_setopt($ch, CURLOPT_POST, 1);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postData[$index]));
+            }
+
+            curl_multi_add_handle($mh, $ch);
+            $curlHandles[] = $ch;
         }
 
-        $result = curl_exec($ch);
-        $error = curl_error($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+        $running = null;
+        do {
+            curl_multi_exec($mh, $running);
+        } while ($running > 0);
 
-        return [
-            'result' => $result,
-            'error' => $error,
-            'httpCode' => $httpCode
-        ];
+        $results = [];
+        foreach ($curlHandles as $ch) {
+            $results[] = [
+                'result' => curl_multi_getcontent($ch),
+                'error' => curl_error($ch),
+                'httpCode' => curl_getinfo($ch, CURLINFO_HTTP_CODE)
+            ];
+            curl_multi_remove_handle($mh, $ch);
+        }
+
+        curl_multi_close($mh);
+
+        return $results;
     }
 
     public function getContent()

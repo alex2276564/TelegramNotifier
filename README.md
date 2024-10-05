@@ -1,9 +1,9 @@
 # TelegramNotifier for PrestaShop 🛍️📱
 
-![PrestaShop](https://img.shields.io/badge/PrestaShop-1.7%20%7C%208.x-blue.svg)
-![PHP](https://img.shields.io/badge/PHP-7.2%20%7C%207.3%20%7C%207.4%20%7C%208.0%20%7C%208.1-8892BF.svg?style=flat-square)
-![Version](https://img.shields.io/github/v/release/alex2276564/TelegramNotifier?color=blue)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
+[![PrestaShop](https://img.shields.io/badge/PrestaShop-1.7%20%7C%208.x-blue.svg)](https://prestashop.com/)
+[![PHP](https://img.shields.io/badge/PHP-7.2%20%7C%207.3%20%7C%207.4%20%7C%208.0%20%7C%208.1-8892BF.svg?style=flat-square)](https://www.php.net/)
+[![Version](https://img.shields.io/github/v/release/alex2276564/TelegramNotifier?color=blue)](https://github.com/alex2276564/TelegramNotifier/releases/latest)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 TelegramNotifier is a powerful PrestaShop module that sends instant notifications about new orders directly to your Telegram. Stay informed about every sale in real-time, right on your smartphone or computer!
 
@@ -14,6 +14,7 @@ TelegramNotifier is a powerful PrestaShop module that sends instant notification
 - 🛠 Easy setup through PrestaShop admin panel
 - 👥 Support for multiple notification recipients
 - 🔒 Secure data transmission via Telegram API
+- 🛠 Integrated error logging system with PrestaShop (PrestaShopLogger)
 
 ## 📦 Installation
 

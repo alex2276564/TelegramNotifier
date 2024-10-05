@@ -133,7 +133,7 @@ class TelegramNotifier extends Module
         $results = $this->executeCurlRequest($urls, $postData, [], true);
 
         $success = true;
-        foreach ($results as $index => $result) {
+        foreach ($results as $result) {
             if ($result['error']) {
                 $this->logError('Failed to send Telegram message: ' . $result['error']);
                 $success = false;

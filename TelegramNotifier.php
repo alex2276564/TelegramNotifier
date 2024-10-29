@@ -9,6 +9,7 @@ class TelegramNotifier extends Module
     private $chatIds;
     private $messageTemplate;
     private $maxMessages;
+    private $updateNotifications;
 
     public function __construct()
     {
@@ -51,6 +52,7 @@ class TelegramNotifier extends Module
         $this->chatIds = $this->getConfigValue('TELEGRAMNOTIFY_CHAT_ID');
         $this->messageTemplate = $this->getConfigValue('TELEGRAMNOTIFY_MESSAGE_TEMPLATE');
         $this->maxMessages = (int) $this->getConfigValue('TELEGRAMNOTIFY_MAX_MESSAGES');
+        $this->updateNotifications = (bool) $this->getConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS');
     }
 
     public function install()
@@ -60,7 +62,8 @@ class TelegramNotifier extends Module
             $this->setConfigValue('TELEGRAMNOTIFY_BOT_TOKEN', '') &&
             $this->setConfigValue('TELEGRAMNOTIFY_CHAT_ID', '') &&
             $this->setConfigValue('TELEGRAMNOTIFY_MESSAGE_TEMPLATE', $this->getDefaultMessageTemplate()) &&
-            $this->setConfigValue('TELEGRAMNOTIFY_MAX_MESSAGES', 5);
+            $this->setConfigValue('TELEGRAMNOTIFY_MAX_MESSAGES', 5) &&
+            $this->setConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS', true);
     }
 
     public function uninstall()
@@ -69,7 +72,8 @@ class TelegramNotifier extends Module
             $this->deleteConfigValue('TELEGRAMNOTIFY_BOT_TOKEN') &&
             $this->deleteConfigValue('TELEGRAMNOTIFY_CHAT_ID') &&
             $this->deleteConfigValue('TELEGRAMNOTIFY_MESSAGE_TEMPLATE') &&
-            $this->deleteConfigValue('TELEGRAMNOTIFY_MAX_MESSAGES');
+            $this->deleteConfigValue('TELEGRAMNOTIFY_MAX_MESSAGES') &&
+            $this->deleteConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS');
     }
 
     public function hookActionValidateOrder($params)
@@ -132,6 +136,13 @@ class TelegramNotifier extends Module
 
         $chatIdsArray = array_map('trim', explode(',', $chatIds));
         $messageParts = $this->splitMessage($message);
+
+        $newVersion = $this->checkForUpdates();
+        if ($newVersion && (bool) $this->getConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS')) {
+            $updateMessage = '🎉 ' . $this->l('A new version of TelegramNotifier is available! Update to') . ' ' . $newVersion . ' ' . $this->l('to get the latest features and bug fixes.') . "\n";
+            $updateMessage .= $this->l('Download:') . ' https://github.com/alex2276564/TelegramNotifier/releases/latest' . "\n\n";
+            $messageParts[0] = $updateMessage . $messageParts[0];
+        }
 
         if ($maxMessages > 0) {
             $messageParts = array_slice($messageParts, 0, $maxMessages);
@@ -286,7 +297,14 @@ class TelegramNotifier extends Module
 
         $newVersion = $this->checkForUpdates();
         if ($newVersion) {
-            $output .= $this->displayConfirmation($this->l('A new version ' . $newVersion . ' is available. Please update the module.'));
+            $updateLink = '<a href="https://github.com/alex2276564/TelegramNotifier/releases/latest" target="_blank">' . $newVersion . '</a>';
+            $output .= $this->displayConfirmation(
+                sprintf(
+                    $this->l('A new version %s is available. Please update the module to get the latest features and bug fixes. - Download: %s'),
+                    $updateLink,
+                    '<a href="https://github.com/alex2276564/TelegramNotifier/releases/latest" target="_blank">' . $this->l('here') . '</a>'
+                )
+            );
         }
 
         if (Tools::isSubmit('submit' . $this->name)) {
@@ -294,6 +312,7 @@ class TelegramNotifier extends Module
             $chatId = $getConfigValueFromForm('TELEGRAMNOTIFY_CHAT_ID');
             $messageTemplate = $getConfigValueFromForm('TELEGRAMNOTIFY_MESSAGE_TEMPLATE');
             $maxMessages = $getConfigValueFromForm('TELEGRAMNOTIFY_MAX_MESSAGES');
+            $updateNotifications = (bool) $getConfigValueFromForm('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS');
 
             $validationResult = $this->validateConfigurationData($botToken, $chatId, $messageTemplate, $maxMessages);
             if (is_array($validationResult) && array_key_exists('messageTemplate', $validationResult)) {
@@ -301,6 +320,7 @@ class TelegramNotifier extends Module
                 $this->setConfigValue('TELEGRAMNOTIFY_CHAT_ID', $chatId);
                 $this->setConfigValue('TELEGRAMNOTIFY_MESSAGE_TEMPLATE', $validationResult['messageTemplate']);
                 $this->setConfigValue('TELEGRAMNOTIFY_MAX_MESSAGES', $maxMessages);
+                $this->setConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS', $updateNotifications);
 
                 // Reload configuration
                 $this->loadConfiguration();
@@ -363,7 +383,26 @@ class TelegramNotifier extends Module
                     'size' => 5,
                     'required' => true,
                     'desc' => $this->l('Enter the maximum number of messages to send per order (0 for unlimited).')
-                ]
+                ],
+                [
+                    'type' => 'switch',
+                    'label' => $this->l('Telegram Update Notifications'),
+                    'name' => 'TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS',
+                    'is_bool' => true,
+                    'values' => [
+                        [
+                            'id' => 'active_on',
+                            'value' => 1,
+                            'label' => $this->l('Enabled'),
+                        ],
+                        [
+                            'id' => 'active_off',
+                            'value' => 0,
+                            'label' => $this->l('Disabled'),
+                        ],
+                    ],
+                    'desc' => $this->l('Receive notifications about module updates directly in Telegram. This may slightly slow down your store, but it is recommended to keep it enabled.'),
+                ],
             ],
             'submit' => [
                 'title' => $this->l('Save'),
@@ -396,6 +435,7 @@ class TelegramNotifier extends Module
         $helper->fields_value['TELEGRAMNOTIFY_CHAT_ID'] = $this->getConfigValue('TELEGRAMNOTIFY_CHAT_ID');
         $helper->fields_value['TELEGRAMNOTIFY_MESSAGE_TEMPLATE'] = $this->getConfigValue('TELEGRAMNOTIFY_MESSAGE_TEMPLATE');
         $helper->fields_value['TELEGRAMNOTIFY_MAX_MESSAGES'] = $this->getConfigValue('TELEGRAMNOTIFY_MAX_MESSAGES');
+        $helper->fields_value['TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS'] = $this->getConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS', 1);
 
         return $helper->generateForm($fields_form);
     }

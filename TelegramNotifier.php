@@ -420,7 +420,7 @@ class TelegramNotifier extends Module
                     'cols' => 60,
                     'rows' => 10,
                     'required' => true,
-                    'desc' => $this->l('Available placeholders: {order_reference}, {customer_name}, {customer_email}, {phone_number}, {ip_address}, {country}, {date_time}, {total_paid}, {shipping_address}, {delivery_method}, {payment_method}, {products_list}, {order_comment}.')
+                    'desc' => $this->l('Available placeholders: {order_reference}, {customer_name}, {customer_email}, {ip_address}, {country}, {date_time}, {phone_number}, {total_paid}, {shipping_address}, {delivery_method}, {payment_method}, {products_list}, {order_comment}.')
                 ],
                 [
                     'type' => 'textarea',
@@ -456,7 +456,7 @@ class TelegramNotifier extends Module
                             'label' => $this->l('Disabled'),
                         ],
                     ],
-                    'desc' => $this->l('Receive notifications about module updates directly in Telegram. This may slightly slow down your store, but it is recommended to keep it enabled.'),
+                    'desc' => $this->l('Receive notifications about module updates directly in Telegram. This may slightly slow down your store due to the external API call used for checking updates, but it is recommended to keep it enabled.'),
                 ],
                 [
                     'type' => 'switch',

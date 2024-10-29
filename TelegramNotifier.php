@@ -27,7 +27,7 @@ class TelegramNotifier extends Module
         parent::__construct();
 
         $this->displayName = $this->l('Telegram Order Notifier');
-        $this->description = $this->l('Sends a Telegram notification when a new order is placed.');
+        $this->description = $this->l('Sends Telegram notifications for new orders and admin logins.');
 
         $this->confirmUninstall = $this->l('Are you sure you want to uninstall?');
 

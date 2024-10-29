@@ -135,14 +135,15 @@ class TelegramNotifier extends Module
         $maxMessages = $this->maxMessages;
 
         $chatIdsArray = array_map('trim', explode(',', $chatIds));
-        $messageParts = $this->splitMessage($message);
 
         $newVersion = $this->checkForUpdates();
         if ($newVersion && (bool) $this->getConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS')) {
             $updateMessage = '🎉 ' . $this->l('A new version of TelegramNotifier is available! Update to') . ' ' . $newVersion . ' ' . $this->l('to get the latest features and bug fixes.') . "\n";
             $updateMessage .= $this->l('Download:') . ' https://github.com/alex2276564/TelegramNotifier/releases/latest' . "\n\n";
-            $messageParts[0] = $updateMessage . $messageParts[0];
+            $message = $updateMessage . $message;
         }
+
+        $messageParts = $this->splitMessage($message);
 
         if ($maxMessages > 0) {
             $messageParts = array_slice($messageParts, 0, $maxMessages);

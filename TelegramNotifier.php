@@ -157,6 +157,7 @@ class TelegramNotifier extends Module
                 $postData[] = [
                     'chat_id' => $chatId,
                     'text' => $part,
+                    'disable_web_page_preview' => true,
                 ];
             }
         }

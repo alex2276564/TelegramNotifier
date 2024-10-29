@@ -115,6 +115,11 @@ class TelegramNotifier extends Module
 
         $customerEmail = $customer->email;
 
+        $ip = Tools::getRemoteAddr();
+        $country = $this->getCountryFromIP($ip);
+
+        $dateTime = date('Y-m-d H:i:s');
+
         $orderMessage = '';
         if ($order->id) {
             $orderMessages = Message::getMessagesByOrderId((int) $order->id);
@@ -145,6 +150,9 @@ class TelegramNotifier extends Module
                 '{order_reference}' => $order->reference,
                 '{customer_name}' => $customer->firstname . ' ' . $customer->lastname,
                 '{customer_email}' => $customerEmail,
+                '{ip_address}' => $ip,
+                '{country}' => $country,
+                '{date_time}' => $dateTime,
                 '{phone_number}' => $phoneNumber,
                 '{total_paid}' => $order->getOrdersTotalPaid(),
                 '{shipping_address}' => $this->formatShippingAddress($address),
@@ -412,7 +420,7 @@ class TelegramNotifier extends Module
                     'cols' => 60,
                     'rows' => 10,
                     'required' => true,
-                    'desc' => $this->l('Available placeholders: {order_reference}, {customer_name}, {customer_email}, {total_paid}, {products_list}, {shipping_address}, {payment_method}, {phone_number}, {order_comment}, {delivery_method}.')
+                    'desc' => $this->l('Available placeholders: {order_reference}, {customer_name}, {customer_email}, {phone_number}, {ip_address}, {country}, {date_time}, {total_paid}, {shipping_address}, {delivery_method}, {payment_method}, {products_list}, {order_comment}.')
                 ],
                 [
                     'type' => 'textarea',
@@ -585,6 +593,9 @@ class TelegramNotifier extends Module
         return "🆕 New order #{order_reference}\n" .
             "👤 Customer: {customer_name}\n" .
             "📧 Email: {customer_email}\n" .
+            "🌐 IP: {ip_address}\n" .
+            "🏳️ Country: {country}\n" .
+            "🕒 Date/Time:{date_time} (Server time)\n" .
             "📞 Phone: {phone_number}\n" .
             "💰 Amount: {total_paid}\n" .
             "🏠 Shipping address:\n{shipping_address}\n" .
@@ -612,7 +623,8 @@ class TelegramNotifier extends Module
             "📧 Email: {employee_email}\n" .
             "🌐 IP Address: {ip_address}\n" .
             "🏳️ Country: {country}\n" .
-            "🕒 Date/Time: {date_time}";
+            "🕒 Date/Time: {date_time} (Server time)\n" .
+            "⚠️ If you don't recognize this login, change your password immediately!";
     }
 
 

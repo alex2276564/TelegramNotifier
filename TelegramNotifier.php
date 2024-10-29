@@ -5,11 +5,14 @@ if (!defined('_PS_VERSION_')) {
 
 class TelegramNotifier extends Module
 {
+    // Cached values
     private $botToken;
     private $chatIds;
     private $messageTemplate;
+    private $adminLoginTemplate;
     private $maxMessages;
     private $updateNotifications;
+    private $adminLoginNotifications;
 
     public function __construct()
     {
@@ -51,19 +54,24 @@ class TelegramNotifier extends Module
         $this->botToken = $this->getConfigValue('TELEGRAMNOTIFY_BOT_TOKEN');
         $this->chatIds = $this->getConfigValue('TELEGRAMNOTIFY_CHAT_ID');
         $this->messageTemplate = $this->getConfigValue('TELEGRAMNOTIFY_MESSAGE_TEMPLATE');
+        $this->adminLoginTemplate = $this->getConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE');
         $this->maxMessages = (int) $this->getConfigValue('TELEGRAMNOTIFY_MAX_MESSAGES');
         $this->updateNotifications = (bool) $this->getConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS');
+        $this->adminLoginNotifications = (bool) $this->getConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_NOTIFICATIONS');
     }
 
     public function install()
     {
         return parent::install() &&
             $this->registerHook('actionValidateOrder') &&
+            $this->registerHook('actionAdminLoginControllerLoginAfter') &&
             $this->setConfigValue('TELEGRAMNOTIFY_BOT_TOKEN', '') &&
             $this->setConfigValue('TELEGRAMNOTIFY_CHAT_ID', '') &&
             $this->setConfigValue('TELEGRAMNOTIFY_MESSAGE_TEMPLATE', $this->getDefaultMessageTemplate()) &&
+            $this->setConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE', $this->getDefaultAdminLoginTemplate()) &&
             $this->setConfigValue('TELEGRAMNOTIFY_MAX_MESSAGES', 5) &&
-            $this->setConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS', true);
+            $this->setConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS', true) &&
+            $this->setConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_NOTIFICATIONS', true);
     }
 
     public function uninstall()
@@ -72,8 +80,29 @@ class TelegramNotifier extends Module
             $this->deleteConfigValue('TELEGRAMNOTIFY_BOT_TOKEN') &&
             $this->deleteConfigValue('TELEGRAMNOTIFY_CHAT_ID') &&
             $this->deleteConfigValue('TELEGRAMNOTIFY_MESSAGE_TEMPLATE') &&
+            $this->deleteConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE') &&
             $this->deleteConfigValue('TELEGRAMNOTIFY_MAX_MESSAGES') &&
-            $this->deleteConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS');
+            $this->deleteConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS') &&
+            $this->deleteConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_NOTIFICATIONS');
+    }
+
+    public function hookActionAdminLoginControllerLoginAfter($params)
+    {
+        if ($this->adminLoginNotifications) {
+            $employee = $params['employee'];
+            $ip = Tools::getRemoteAddr();
+            $country = $this->getCountryFromIP($ip);
+
+            $message = strtr($this->adminLoginTemplate, [
+                '{employee_name}' => $employee->firstname . ' ' . $employee->lastname,
+                '{employee_email}' => $employee->email,
+                '{ip_address}' => $ip,
+                '{country}' => $country,
+                '{date_time}' => date('Y-m-d H:i:s'),
+            ]);
+
+            $this->sendTelegramMessage($message);
+        }
     }
 
     public function hookActionValidateOrder($params)
@@ -110,8 +139,8 @@ class TelegramNotifier extends Module
         $chatIds = $this->chatIds;
         $messageTemplate = $this->messageTemplate;
         $maxMessages = $this->maxMessages;
-        $validate = $this->validateConfigurationData($botToken, $chatIds, $messageTemplate, $maxMessages);
-        if (is_array($validate) && array_key_exists('messageTemplate', $validate)) {
+        $validate = $this->validateConfigurationData($botToken, $chatIds, $messageTemplate, $this->adminLoginTemplate, $maxMessages);
+        if (is_array($validate) && !isset($validate['errors'])) {
             $message = strtr($messageTemplate, [
                 '{order_reference}' => $order->reference,
                 '{customer_name}' => $customer->firstname . ' ' . $customer->lastname,
@@ -125,6 +154,8 @@ class TelegramNotifier extends Module
                 '{order_comment}' => $orderMessage,
             ]);
             $this->sendTelegramMessage($message);
+        } else {
+            $this->logError('Invalid configuration: ' . json_encode($validate));
         }
     }
 
@@ -136,8 +167,9 @@ class TelegramNotifier extends Module
 
         $chatIdsArray = array_map('trim', explode(',', $chatIds));
 
+        // Adding an update notification to the beginning of a message
         $newVersion = $this->checkForUpdates();
-        if ($newVersion && (bool) $this->getConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS')) {
+        if ($newVersion && (bool) $this->updateNotifications) {
             $updateMessage = '🎉 ' . $this->l('A new version of TelegramNotifier is available! Update to') . ' ' . $newVersion . ' ' . $this->l('to get the latest features and bug fixes.') . "\n";
             $updateMessage .= $this->l('Download:') . ' https://github.com/alex2276564/TelegramNotifier/releases/latest' . "\n\n";
             $message = $updateMessage . $message;
@@ -313,23 +345,27 @@ class TelegramNotifier extends Module
             $botToken = $getConfigValueFromForm('TELEGRAMNOTIFY_BOT_TOKEN');
             $chatId = $getConfigValueFromForm('TELEGRAMNOTIFY_CHAT_ID');
             $messageTemplate = $getConfigValueFromForm('TELEGRAMNOTIFY_MESSAGE_TEMPLATE');
+            $adminLoginTemplate = $getConfigValueFromForm('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE');
             $maxMessages = $getConfigValueFromForm('TELEGRAMNOTIFY_MAX_MESSAGES');
             $updateNotifications = (bool) $getConfigValueFromForm('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS');
+            $adminLoginNotifications = (bool) $getConfigValueFromForm('TELEGRAMNOTIFY_ADMIN_LOGIN_NOTIFICATIONS');
 
-            $validationResult = $this->validateConfigurationData($botToken, $chatId, $messageTemplate, $maxMessages);
+            $validationResult = $this->validateConfigurationData($botToken, $chatId, $messageTemplate, $adminLoginTemplate, $maxMessages);
             if (is_array($validationResult) && array_key_exists('messageTemplate', $validationResult)) {
                 $this->setConfigValue('TELEGRAMNOTIFY_BOT_TOKEN', $botToken);
                 $this->setConfigValue('TELEGRAMNOTIFY_CHAT_ID', $chatId);
                 $this->setConfigValue('TELEGRAMNOTIFY_MESSAGE_TEMPLATE', $validationResult['messageTemplate']);
+                $this->setConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE', $validationResult['adminLoginTemplate']);
                 $this->setConfigValue('TELEGRAMNOTIFY_MAX_MESSAGES', $maxMessages);
                 $this->setConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS', $updateNotifications);
+                $this->setConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_NOTIFICATIONS', $adminLoginNotifications);
 
                 // Reload configuration
                 $this->loadConfiguration();
 
                 $output .= $this->displayConfirmation($this->l('Settings updated'));
                 if ($validationResult['default']) {
-                    $output .= $this->displayWarning($this->l('Message Template is empty. Using default template.'));
+                    $output .= $this->displayWarning($this->l('One or more templates were empty. Using default templates.'));
                 }
             } else {
                 foreach ($validationResult as $error) {
@@ -379,6 +415,15 @@ class TelegramNotifier extends Module
                     'desc' => $this->l('Available placeholders: {order_reference}, {customer_name}, {customer_email}, {total_paid}, {products_list}, {shipping_address}, {payment_method}, {phone_number}, {order_comment}, {delivery_method}.')
                 ],
                 [
+                    'type' => 'textarea',
+                    'label' => $this->l('Admin Login Notification Template'),
+                    'name' => 'TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE',
+                    'cols' => 60,
+                    'rows' => 10,
+                    'required' => true,
+                    'desc' => $this->l('Available placeholders: {employee_name}, {employee_email}, {ip_address}, {country}, {date_time}.')
+                ],
+                [
                     'type' => 'text',
                     'label' => $this->l('Max Messages per Order'),
                     'name' => 'TELEGRAMNOTIFY_MAX_MESSAGES',
@@ -404,6 +449,25 @@ class TelegramNotifier extends Module
                         ],
                     ],
                     'desc' => $this->l('Receive notifications about module updates directly in Telegram. This may slightly slow down your store, but it is recommended to keep it enabled.'),
+                ],
+                [
+                    'type' => 'switch',
+                    'label' => $this->l('Admin Login Notifications'),
+                    'name' => 'TELEGRAMNOTIFY_ADMIN_LOGIN_NOTIFICATIONS',
+                    'is_bool' => true,
+                    'values' => [
+                        [
+                            'id' => 'active_on',
+                            'value' => 1,
+                            'label' => $this->l('Enabled'),
+                        ],
+                        [
+                            'id' => 'active_off',
+                            'value' => 0,
+                            'label' => $this->l('Disabled'),
+                        ],
+                    ],
+                    'desc' => $this->l('Receive notifications when someone logs into the admin panel.'),
                 ],
             ],
             'submit' => [
@@ -436,8 +500,10 @@ class TelegramNotifier extends Module
         $helper->fields_value['TELEGRAMNOTIFY_BOT_TOKEN'] = $this->getConfigValue('TELEGRAMNOTIFY_BOT_TOKEN');
         $helper->fields_value['TELEGRAMNOTIFY_CHAT_ID'] = $this->getConfigValue('TELEGRAMNOTIFY_CHAT_ID');
         $helper->fields_value['TELEGRAMNOTIFY_MESSAGE_TEMPLATE'] = $this->getConfigValue('TELEGRAMNOTIFY_MESSAGE_TEMPLATE');
+        $helper->fields_value['TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE'] = $this->getConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE');
         $helper->fields_value['TELEGRAMNOTIFY_MAX_MESSAGES'] = $this->getConfigValue('TELEGRAMNOTIFY_MAX_MESSAGES');
-        $helper->fields_value['TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS'] = $this->getConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS', 1);
+        $helper->fields_value['TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS'] = $this->getConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS');
+        $helper->fields_value['TELEGRAMNOTIFY_ADMIN_LOGIN_NOTIFICATIONS'] = $this->getConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_NOTIFICATIONS');
 
         return $helper->generateForm($fields_form);
     }
@@ -457,7 +523,7 @@ class TelegramNotifier extends Module
         return $formattedAddress;
     }
 
-    private function validateConfigurationData($botToken, $chatIds, $messageTemplate, $maxMessages)
+    private function validateConfigurationData($botToken, $chatIds, $messageTemplate, $adminLoginTemplate, $maxMessages)
     {
         $errors = [];
         $default = false;
@@ -476,8 +542,14 @@ class TelegramNotifier extends Module
                 }
             }
         }
+
         if (empty($messageTemplate)) {
             $messageTemplate = $this->getDefaultMessageTemplate();
+            $default = true;
+        }
+
+        if (empty($adminLoginTemplate)) {
+            $adminLoginTemplate = $this->getDefaultAdminLoginTemplate();
             $default = true;
         }
 
@@ -489,7 +561,11 @@ class TelegramNotifier extends Module
             return $errors;
         }
 
-        return ['messageTemplate' => $messageTemplate, 'default' => $default];
+        return [
+            'messageTemplate' => $messageTemplate,
+            'adminLoginTemplate' => $adminLoginTemplate,
+            'default' => $default
+        ];
     }
 
     private function logError($message)
@@ -517,6 +593,28 @@ class TelegramNotifier extends Module
             "🛍️ Products:\n{products_list}\n" .
             "📝 Comment: {order_comment}";
     }
+
+    private function getCountryFromIP($ip)
+    {
+        $url = "http://ip-api.com/json/{$ip}";
+        $response = $this->executeCurlRequest($url);
+        if ($response['error'] || $response['httpCode'] != 200) {
+            return 'Unknown';
+        }
+        $data = json_decode($response['result'], true);
+        return $data['country'] ?? 'Unknown';
+    }
+
+    private function getDefaultAdminLoginTemplate()
+    {
+        return "🔐 Admin Login Alert\n" .
+            "👤 Employee: {employee_name}\n" .
+            "📧 Email: {employee_email}\n" .
+            "🌐 IP Address: {ip_address}\n" .
+            "🏳️ Country: {country}\n" .
+            "🕒 Date/Time: {date_time}";
+    }
+
 
     private function testTelegramMessage()
     {

@@ -595,7 +595,7 @@ class TelegramNotifier extends Module
             "📧 Email: {customer_email}\n" .
             "🌐 IP: {ip_address}\n" .
             "🏳️ Country: {country}\n" .
-            "🕒 Date/Time:{date_time} (Server time)\n" .
+            "🕒 Date/Time: {date_time} (Server time)\n" .
             "📞 Phone: {phone_number}\n" .
             "💰 Amount: {total_paid}\n" .
             "🏠 Shipping address:\n{shipping_address}\n" .

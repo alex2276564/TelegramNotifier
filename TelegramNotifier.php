@@ -140,31 +140,23 @@ class TelegramNotifier extends Module
             $productslist .= "- " . $productName . $attributes . " x " . (int) $product['product_quantity'] . "\n";
         }
 
-        $botToken = $this->botToken;
-        $chatIds = $this->chatIds;
         $messageTemplate = $this->messageTemplate;
-        $maxMessages = $this->maxMessages;
-        $validate = $this->validateConfigurationData($botToken, $chatIds, $messageTemplate, $this->adminLoginTemplate, $maxMessages);
-        if (is_array($validate) && !isset($validate['errors'])) {
-            $message = strtr($messageTemplate, [
-                '{order_reference}' => $order->reference,
-                '{customer_name}' => $customer->firstname . ' ' . $customer->lastname,
-                '{customer_email}' => $customerEmail,
-                '{ip_address}' => $ip,
-                '{country}' => $country,
-                '{date_time}' => $dateTime,
-                '{phone_number}' => $phoneNumber,
-                '{total_paid}' => Tools::displayPrice($order->getOrdersTotalPaid(), $order->id_currency, false),
-                '{shipping_address}' => $this->formatShippingAddress($address),
-                '{delivery_method}' => $deliveryMethod,
-                '{payment_method}' => $order->payment,
-                '{products_list}' => $productslist,
-                '{order_comment}' => $orderMessage,
-            ]);
-            $this->sendTelegramMessage($message);
-        } else {
-            $this->logError('Invalid configuration: ' . json_encode($validate));
-        }
+        $message = strtr($messageTemplate, [
+            '{order_reference}' => $order->reference,
+            '{customer_name}' => $customer->firstname . ' ' . $customer->lastname,
+            '{customer_email}' => $customerEmail,
+            '{ip_address}' => $ip,
+            '{country}' => $country,
+            '{date_time}' => $dateTime,
+            '{phone_number}' => $phoneNumber,
+            '{total_paid}' => Tools::displayPrice($order->getOrdersTotalPaid(), $order->id_currency, false),
+            '{shipping_address}' => $this->formatShippingAddress($address),
+            '{delivery_method}' => $deliveryMethod,
+            '{payment_method}' => $order->payment,
+            '{products_list}' => $productslist,
+            '{order_comment}' => $orderMessage,
+        ]);
+        $this->sendTelegramMessage($message);
     }
 
     private function sendTelegramMessage($message)
@@ -172,6 +164,12 @@ class TelegramNotifier extends Module
         $botToken = $this->botToken;
         $chatIds = $this->chatIds;
         $maxMessages = $this->maxMessages;
+
+        $validate = $this->validateConfigurationData($botToken, $chatIds, $this->messageTemplate, $this->adminLoginTemplate, $maxMessages);
+        if (is_array($validate) && isset($validate[0])) {
+            $this->logError('Invalid configuration: ' . json_encode($validate));
+            return false;
+        }
 
         $chatIdsArray = array_map('trim', explode(',', $chatIds));
 

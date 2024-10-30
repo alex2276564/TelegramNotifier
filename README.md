@@ -43,7 +43,7 @@ TelegramNotifier is a powerful PrestaShop module that sends instant notification
    - `{customer_name}`: Name of the customer 👤
    - `{customer_email}`: Email address of the customer 📧
    - `{ip_address}`: The IP address of the customer 🌐
-   - `{country}`: The country of the customer 🏳️ (**Note:** Using this placeholder might slightly slow down your store due to the external API call.) 
+   - `{country}`: The country of the customer 🏳️
    - `{date_time}`: The date and time of the order (server time) 🕒
    - `{phone_number}`: Customer's phone number 📞
    - `{total_paid}`: Total amount paid for the order 💰
@@ -58,7 +58,7 @@ TelegramNotifier is a powerful PrestaShop module that sends instant notification
    - `{employee_name}`: Name of the employee who logged in 👤
    - `{employee_email}`: Email address of the employee 📧
    - `{ip_address}`: IP address used for login 🌐
-   - `{country}`: Country associated with the IP address 🏳️ (**Note:** Using this placeholder might slightly slow down your store due to the external API call.) 
+   - `{country}`: Country associated with the IP address 🏳️
    - `{date_time}`: Date and time of the login (server time) 🕒
 
 5. **Max Messages per Order**:
@@ -70,14 +70,18 @@ TelegramNotifier is a powerful PrestaShop module that sends instant notification
 
 6. **Telegram Update Notifications**:
    - Stay informed about new updates to the TelegramNotifier module directly through Telegram messages.
-   - **Note:** This feature might slightly slow down your store due to the external API call used to check for updates, but it is recommended to keep it enabled.
 
 7. **Admin Login Notifications**:
    - Enable to receive alerts when an admin logs into the PrestaShop backend, providing security insights in real-time.
 
 8. Save your settings and use the "Test Message" button to verify the configuration.
 
-## ⚠️ Security Note
+## ⚠️ Notes
+
+- Using the `{country}` placeholder in the message templates might slightly slow down your store due to the external API call required to retrieve the country information.
+- The Telegram Update Notifications feature might slightly slow down your store due to the external API call used to check for updates, but it is recommended to keep it enabled.
+
+## 🔐 Security Note
 The Admin Login Notifications feature helps you monitor access to your store's backend. This is especially useful in cases where an employee's account has been compromised, allowing you to react quickly and prevent potential damage. **For example, if you receive a login notification from a country you don't typically operate in, it could indicate unauthorized access.** If you receive a notification for a login you don't recognize, change your admin password immediately!
 
 ## 🔧 Troubleshooting

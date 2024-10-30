@@ -154,7 +154,7 @@ class TelegramNotifier extends Module
                 '{country}' => $country,
                 '{date_time}' => $dateTime,
                 '{phone_number}' => $phoneNumber,
-                '{total_paid}' => $order->getOrdersTotalPaid(),
+                '{total_paid}' => Tools::displayPrice($order->getOrdersTotalPaid(), $order->id_currency, false),
                 '{shipping_address}' => $this->formatShippingAddress($address),
                 '{delivery_method}' => $deliveryMethod,
                 '{payment_method}' => $order->payment,

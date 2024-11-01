@@ -1,0 +1,109 @@
+name: Bug Report
+description: Report a bug in TelegramNotifier for PrestaShop
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: hosting-type
+    attributes:
+      label: Hosting Type
+      description: What type of hosting are you using?
+      options:
+        - "Shared Hosting"
+        - "VPS/VDS"
+        - "Dedicated Server"
+        - "Cloud Hosting (AWS, Google Cloud, etc.)"
+        - "Local Development"
+        - "Other"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: input
+    id: hosting-provider
+    attributes:
+      label: Hosting Provider
+      description: Who is your hosting provider?
+      placeholder: "e.g., Hostinger, OVH, AWS, etc."
+    validations:
+      required: false
+
+  - type: input
+    id: prestashop-version
+    attributes:
+      label: PrestaShop Version
+      description: What version of PrestaShop are you running?
+      placeholder: "e.g., 8.2.0"
+    validations:
+      required: true
+
+  - type: input
+    id: php-version
+    attributes:
+      label: PHP Version
+      description: What version of PHP are you running?
+      placeholder: "e.g., 8.1"
+    validations:
+      required: true
+
+  - type: input
+    id: module-version
+    attributes:
+      label: TelegramNotifier Version
+      description: What version of TelegramNotifier are you using?
+      placeholder: "e.g., 1.0.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: notification-type
+    attributes:
+      label: Notification Type
+      description: Which type of notification is affected?
+      options:
+        - "Order notifications"
+        - "Admin login notifications"
+        - "Update notifications"
+        - "Test message"
+        - "All notifications"
+        - "Other"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the bug and how to reproduce it
+      placeholder: |
+        1. Go to module configuration...
+        2. Set up the following...
+        3. Try to...
+        4. See error...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: PrestaShop Logs
+      description: Please copy and paste any relevant logs from Advanced Parameters > Logs
+      render: shell
+
+  - type: textarea
+    id: configuration
+    attributes:
+      label: Module Configuration
+      description: Please provide your module configuration (remove sensitive data like bot token)
+      placeholder: |
+        - Message template used
+        - Max messages per order setting
+        - Other relevant settings

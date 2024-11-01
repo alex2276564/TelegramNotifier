@@ -328,6 +328,155 @@ class TelegramNotifier extends Module
         return $results;
     }
 
+    private function formatShippingAddress($address)
+    {
+        $formattedAddress = $address->address1;
+        if (!empty($address->address2)) {
+            $formattedAddress .= ", " . $address->address2;
+        }
+        $formattedAddress .= "\n" . $address->postcode . " " . $address->city;
+        if (!empty($address->state)) {
+            $formattedAddress .= ", " . $address->state;
+        }
+        $formattedAddress .= "\n" . $address->country;
+
+        return $formattedAddress;
+    }
+
+    private function validateConfigurationData($botToken, $chatIds, $messageTemplate, $adminLoginTemplate, $maxMessages)
+    {
+        $errors = [];
+        $default = false;
+
+        if (empty($botToken)) {
+            $errors[] = $this->l('Bot Token is required.');
+        }
+
+        if (empty($chatIds)) {
+            $errors[] = $this->l('Chat ID(s) are required.');
+        } else {
+            $chatIdsArray = array_map('trim', explode(',', $chatIds));
+            foreach ($chatIdsArray as $chatId) {
+                if (!ctype_digit($chatId) || strlen($chatId) < 9 || strlen($chatId) > 10) {
+                    $errors[] = $this->l('Invalid Chat ID: ') . $chatId;
+                }
+            }
+        }
+
+        if (empty($messageTemplate)) {
+            $messageTemplate = $this->getDefaultMessageTemplate();
+            $default = true;
+        }
+
+        if (empty($adminLoginTemplate)) {
+            $adminLoginTemplate = $this->getDefaultAdminLoginTemplate();
+            $default = true;
+        }
+
+        if (!is_numeric($maxMessages) || $maxMessages < 0 || !ctype_digit(strval($maxMessages))) {
+            $errors[] = $this->l('Max Messages must be a non-negative integer.');
+        }
+
+        if (!empty($errors)) {
+            return $errors;
+        }
+
+        return [
+            'messageTemplate' => $messageTemplate,
+            'adminLoginTemplate' => $adminLoginTemplate,
+            'default' => $default
+        ];
+    }
+
+    private function logError($message)
+    {
+        PrestaShopLogger::addLog(
+            'TelegramNotifier error: ' . $message,
+            3,
+            null,
+            'TelegramNotifier',
+            null,
+            true
+        );
+    }
+
+    private function getDefaultMessageTemplate()
+    {
+        return "🆕 New order #{order_reference}\n" .
+            "👤 Customer: {customer_name}\n" .
+            "📧 Email: {customer_email}\n" .
+            "🌐 IP: {ip_address}\n" .
+            "🏳️ Country: {country}\n" .
+            "🕒 Date/Time: {date_time} (Server time)\n" .
+            "📞 Phone: {phone_number}\n" .
+            "💰 Amount: {total_paid}\n" .
+            "🏠 Shipping address:\n{shipping_address}\n" .
+            "📦 Delivery method: {delivery_method}\n" .
+            "💳 Payment method: {payment_method}\n" .
+            "🛍️ Products:\n{products_list}\n" .
+            "📝 Comment: {order_comment}";
+    }
+
+    private function getDefaultAdminLoginTemplate()
+    {
+        return "🔐 Admin Login Alert\n" .
+            "👤 Employee: {employee_name}\n" .
+            "📧 Email: {employee_email}\n" .
+            "🌐 IP Address: {ip_address}\n" .
+            "🏳️ Country: {country}\n" .
+            "🕒 Date/Time: {date_time} (Server time)\n" .
+            "⚠️ If you don't recognize this login, change your password immediately!";
+    }
+
+
+    private function getCountryFromIP($ip)
+    {
+        $url = "http://ip-api.com/json/{$ip}";
+        $response = $this->executeCurlRequest($url);
+        if ($response['error'] || $response['httpCode'] != 200) {
+            return 'Unknown';
+        }
+        $data = json_decode($response['result'], true);
+        return $data['country'] ?? 'Unknown';
+    }
+
+    private function testTelegramMessage()
+    {
+        $testMessage = 'This is a test message from your PrestaShop Telegram Notifier.';
+        $result = $this->sendTelegramMessage($testMessage);
+        if ($result) {
+            return $this->displayConfirmation($this->l('Test message sent successfully.'));
+        } else {
+            return $this->displayError($this->l('Failed to send test message. Please check your settings.'));
+        }
+    }
+
+    private function checkForUpdates()
+    {
+        $url = "https://api.github.com/repos/alex2276564/TelegramNotifier/releases/latest";
+        $headers = ["User-Agent: php"];
+
+        $response = $this->executeCurlRequest($url, null, $headers);
+
+        if ($response['error']) {
+            $this->logError('Failed to check for updates: ' . $response['error']);
+            return false;
+        }
+
+        if ($response['httpCode'] != 200) {
+            $this->logError('Failed to check for updates: HTTP code ' . $response['httpCode']);
+            return false;
+        }
+
+        $release = json_decode($response['result'], true);
+
+        if (isset($release['tag_name']) && version_compare($release['tag_name'], $this->version, '>')) {
+            return $release['tag_name'];
+        }
+
+        return false;
+    }
+
     public function getContent()
     {
         $output = '';
@@ -512,154 +661,5 @@ class TelegramNotifier extends Module
         $helper->fields_value['TELEGRAMNOTIFY_ADMIN_LOGIN_NOTIFICATIONS'] = $this->getConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_NOTIFICATIONS');
 
         return $helper->generateForm($fields_form);
-    }
-
-    private function formatShippingAddress($address)
-    {
-        $formattedAddress = $address->address1;
-        if (!empty($address->address2)) {
-            $formattedAddress .= ", " . $address->address2;
-        }
-        $formattedAddress .= "\n" . $address->postcode . " " . $address->city;
-        if (!empty($address->state)) {
-            $formattedAddress .= ", " . $address->state;
-        }
-        $formattedAddress .= "\n" . $address->country;
-
-        return $formattedAddress;
-    }
-
-    private function validateConfigurationData($botToken, $chatIds, $messageTemplate, $adminLoginTemplate, $maxMessages)
-    {
-        $errors = [];
-        $default = false;
-
-        if (empty($botToken)) {
-            $errors[] = $this->l('Bot Token is required.');
-        }
-
-        if (empty($chatIds)) {
-            $errors[] = $this->l('Chat ID(s) are required.');
-        } else {
-            $chatIdsArray = array_map('trim', explode(',', $chatIds));
-            foreach ($chatIdsArray as $chatId) {
-                if (!ctype_digit($chatId) || strlen($chatId) < 9 || strlen($chatId) > 10) {
-                    $errors[] = $this->l('Invalid Chat ID: ') . $chatId;
-                }
-            }
-        }
-
-        if (empty($messageTemplate)) {
-            $messageTemplate = $this->getDefaultMessageTemplate();
-            $default = true;
-        }
-
-        if (empty($adminLoginTemplate)) {
-            $adminLoginTemplate = $this->getDefaultAdminLoginTemplate();
-            $default = true;
-        }
-
-        if (!is_numeric($maxMessages) || $maxMessages < 0 || !ctype_digit(strval($maxMessages))) {
-            $errors[] = $this->l('Max Messages must be a non-negative integer.');
-        }
-
-        if (!empty($errors)) {
-            return $errors;
-        }
-
-        return [
-            'messageTemplate' => $messageTemplate,
-            'adminLoginTemplate' => $adminLoginTemplate,
-            'default' => $default
-        ];
-    }
-
-    private function logError($message)
-    {
-        PrestaShopLogger::addLog(
-            'TelegramNotifier error: ' . $message,
-            3,
-            null,
-            'TelegramNotifier',
-            null,
-            true
-        );
-    }
-
-    private function getDefaultMessageTemplate()
-    {
-        return "🆕 New order #{order_reference}\n" .
-            "👤 Customer: {customer_name}\n" .
-            "📧 Email: {customer_email}\n" .
-            "🌐 IP: {ip_address}\n" .
-            "🏳️ Country: {country}\n" .
-            "🕒 Date/Time: {date_time} (Server time)\n" .
-            "📞 Phone: {phone_number}\n" .
-            "💰 Amount: {total_paid}\n" .
-            "🏠 Shipping address:\n{shipping_address}\n" .
-            "📦 Delivery method: {delivery_method}\n" .
-            "💳 Payment method: {payment_method}\n" .
-            "🛍️ Products:\n{products_list}\n" .
-            "📝 Comment: {order_comment}";
-    }
-
-    private function getCountryFromIP($ip)
-    {
-        $url = "http://ip-api.com/json/{$ip}";
-        $response = $this->executeCurlRequest($url);
-        if ($response['error'] || $response['httpCode'] != 200) {
-            return 'Unknown';
-        }
-        $data = json_decode($response['result'], true);
-        return $data['country'] ?? 'Unknown';
-    }
-
-    private function getDefaultAdminLoginTemplate()
-    {
-        return "🔐 Admin Login Alert\n" .
-            "👤 Employee: {employee_name}\n" .
-            "📧 Email: {employee_email}\n" .
-            "🌐 IP Address: {ip_address}\n" .
-            "🏳️ Country: {country}\n" .
-            "🕒 Date/Time: {date_time} (Server time)\n" .
-            "⚠️ If you don't recognize this login, change your password immediately!";
-    }
-
-
-    private function testTelegramMessage()
-    {
-        $testMessage = 'This is a test message from your PrestaShop Telegram Notifier.';
-        $result = $this->sendTelegramMessage($testMessage);
-        if ($result) {
-            return $this->displayConfirmation($this->l('Test message sent successfully.'));
-        } else {
-            return $this->displayError($this->l('Failed to send test message. Please check your settings.'));
-        }
-    }
-
-    private function checkForUpdates()
-    {
-        $url = "https://api.github.com/repos/alex2276564/TelegramNotifier/releases/latest";
-        $headers = ["User-Agent: php"];
-
-        $response = $this->executeCurlRequest($url, null, $headers);
-
-        if ($response['error']) {
-            $this->logError('Failed to check for updates: ' . $response['error']);
-            return false;
-        }
-
-        if ($response['httpCode'] != 200) {
-            $this->logError('Failed to check for updates: HTTP code ' . $response['httpCode']);
-            return false;
-        }
-
-        $release = json_decode($response['result'], true);
-
-        if (isset($release['tag_name']) && version_compare($release['tag_name'], $this->version, '>')) {
-            return $release['tag_name'];
-        }
-
-        return false;
     }
 }

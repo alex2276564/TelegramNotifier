@@ -29,7 +29,7 @@ class TelegramNotifier extends Module
         parent::__construct();
 
         $this->displayName = $this->l('Telegram Notifier');
-        $this->description = $this->l('Sends Telegram notifications for new orders and admin logins.');
+        $this->description = $this->l('Sends Telegram notifications for new orders, admin logins, and new customer registrations.');
 
         $this->confirmUninstall = $this->l('Are you sure you want to uninstall?');
 
@@ -56,7 +56,7 @@ class TelegramNotifier extends Module
         $this->botToken = $this->getConfigValue('TELEGRAMNOTIFY_BOT_TOKEN');
         $this->chatIds = $this->getConfigValue('TELEGRAMNOTIFY_CHAT_ID');
         $this->maxMessages = (int) $this->getConfigValue('TELEGRAMNOTIFY_MAX_MESSAGES');
-        $this->orderTemplate = $this->getConfigValue('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE');
+        $this->newOrderTemplate = $this->getConfigValue('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE');
         $this->adminLoginTemplate = $this->getConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE');
         $this->newCustomerTemplate = $this->getConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE');
         $this->updateNotifications = (bool) $this->getConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS');
@@ -77,7 +77,7 @@ class TelegramNotifier extends Module
             $this->setConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE', $this->getDefaultAdminLoginTemplate()) &&
             $this->setConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE', $this->getDefaultNewCustomerTemplate()) &&
             $this->setConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS', true) &&
-            $this->setConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_NOTIFICATIONS', true) &&
+            $this->setConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_NOTIFICATIONS', false) &&
             $this->setConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_NOTIFICATIONS', true);
     }
 
@@ -105,7 +105,7 @@ class TelegramNotifier extends Module
 
             $birthday = $customer->birthday;
             $gender = $this->getGenderName($customer->id_gender);
-            $newsletter = $customer->newsletter ? 'Yes' : 'No';
+            $newsletter = $customer->newsletter ? '✅' : '❌';
 
             $birthdayFormatted = !empty($birthday) ? date('Y-m-d', strtotime($birthday)) : 'Не указана';
 
@@ -181,7 +181,7 @@ class TelegramNotifier extends Module
         $shop = new Shop($order->id_shop);
         $shopName = $shop->name;
 
-        $newOrderTemplate = $this->orderTemplate;
+        $newOrderTemplate = $this->newOrderTemplate;
         $message = strtr($newOrderTemplate, [
             '{order_reference}' => $order->reference,
             '{shop_name}' => $shopName,
@@ -211,7 +211,7 @@ class TelegramNotifier extends Module
             $botToken,
             $chatIds,
             $maxMessages,
-            $this->orderTemplate,
+            $this->newOrderTemplate,
             $this->adminLoginTemplate,
             $this->newCustomerTemplate,
             $this->updateNotifications,

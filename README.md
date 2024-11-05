@@ -5,18 +5,20 @@
 [![Version](https://img.shields.io/github/v/release/alex2276564/TelegramNotifier?color=blue)](https://github.com/alex2276564/TelegramNotifier/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-TelegramNotifier is a powerful PrestaShop module that sends instant notifications about new orders and admin logins directly to your Telegram. Stay informed about every sale and monitor your store's security in real-time, right on your smartphone or computer!
+TelegramNotifier is a powerful PrestaShop module that sends instant notifications about new orders, admin logins, and new customer registrations directly to your Telegram. Stay informed about every sale, monitor your store's security, and keep track of new customers in real-time, right on your smartphone or computer!
 
 ## ✨ Features
 
 - 🚀 Instant notifications for new orders
 - 🔐 Admin login notifications with IP address, country, and timestamp
+- 👤 New customer registration notifications with detailed customer information
 - 📊 Detailed order information, including product list and shipping address
 - 🛠 Easy setup through PrestaShop admin panel
 - 👥 Support for multiple notification recipients
 - 🔒 Secure data transmission via Telegram API
 - 🛠 Integrated error logging system with PrestaShop (PrestaShopLogger)
 - 🔄 Automatic check for module updates directly through Telegram messages
+- 🌐 Multi-shop support with `{shop_name}` placeholder
 
 ## 📦 Installation
 
@@ -37,9 +39,19 @@ TelegramNotifier is a powerful PrestaShop module that sends instant notification
    - Visit `https://api.telegram.org/bot<YourBOTToken>/getUpdates` to get the chat ID.
    - You can enter multiple chat IDs separated by commas.
 
-3. **Message Template**:
-   Customize the notification message using available placeholders:
+3. **Max Messages per Action**:
+   - This setting allows you to control the maximum number of messages sent per action.
+   - In most cases, you don't need to change this value.
+   - If your store frequently receives many simultaneous orders, it's recommended to reduce this value to 2. This will ensure more efficient message delivery, but the messages may be less detailed.
+   - All messages will be sent 100% but not fully detailed if you decrease this value.
+   - Set this value to 0 for unlimited messages per action.
+
+4. **Message Templates**:
+   Customize the notification messages using available placeholders:
+
+   **New Order Notification Template**:
    - `{order_reference}`: The unique order reference 📦
+   - `{shop_name}`: The name of the shop 🛍️
    - `{customer_name}`: Name of the customer 👤
    - `{customer_email}`: Email address of the customer 📧
    - `{ip_address}`: The IP address of the customer 🌐
@@ -53,23 +65,28 @@ TelegramNotifier is a powerful PrestaShop module that sends instant notification
    - `{products_list}`: List of products in the order 🛍️
    - `{order_comment}`: Any comment left by the customer 📝
 
-4. **Admin Login Notification Template**:
-   Customize the notification message for admin logins using these placeholders:
+   **Admin Login Notification Template**:
    - `{employee_name}`: Name of the employee who logged in 👤
    - `{employee_email}`: Email address of the employee 📧
    - `{ip_address}`: IP address used for login 🌐
    - `{country}`: Country associated with the IP address 🏳️
    - `{date_time}`: Date and time of the login (server time) 🕒
 
-5. **Max Messages per Order**:
-   - This setting allows you to control the maximum number of messages sent per order.
-   - In most cases, you don't need to change this value.
-   - If your store frequently receives many simultaneous orders, it's recommended to reduce this value to 2. This will ensure more efficient message delivery, but the messages may be less detailed.
-   - All messages will be sent 100% but not fully detailed if you decrease this value.
-   - Set this value to 0 for unlimited messages per order.
+   **New Customer Notification Template**:
+   - `{customer_name}`: Name of the customer 👤
+   - `{customer_email}`: Email address of the customer 📧
+   - `{ip_address}`: The IP address of the customer 🌐
+   - `{country}`: The country of the customer 🏳️
+   - `{date_time}`: The date and time of the registration (server time) 🕒
+   - `{birthday}`: Customer's birthday 🎂
+   - `{gender}`: Customer's gender 👫
+   - `{newsletter}`: Whether the customer subscribed to the newsletter 📰
 
-6. **Telegram Update Notifications**:
+5. **Telegram Update Notifications**:
    - Stay informed about new updates to the TelegramNotifier module directly through Telegram messages.
+
+6. **New Customer Registration Notifications**:
+   - Enable to receive notifications when a new customer registers.
 
 7. **Admin Login Notifications**:
    - Enable to receive alerts when an admin logs into the PrestaShop backend, providing security insights in real-time.

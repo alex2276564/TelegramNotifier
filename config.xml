@@ -3,7 +3,7 @@
     <name>TelegramNotifier</name>
     <displayName><![CDATA[Telegram Notifier]]></displayName>
     <version><![CDATA[1.0.4]]></version>
-    <description><![CDATA[Sends Telegram notifications for new orders and admin logins.]]></description>
+    <description><![CDATA[Sends Telegram notifications for new orders, admin logins, and new customer registrations..]]></description>
     <author><![CDATA[alex2276564]]></author>
     <tab><![CDATA[administration]]></tab>
     <is_configurable>1</is_configurable>

@@ -178,9 +178,13 @@ class TelegramNotifier extends Module
             $productslist .= "- " . $productName . $attributes . " x " . (int) $product['product_quantity'] . "\n";
         }
 
+        $shop = new Shop($order->id_shop);
+        $shopName = $shop->name;
+
         $newOrderTemplate = $this->orderTemplate;
         $message = strtr($newOrderTemplate, [
             '{order_reference}' => $order->reference,
+            '{shop_name}' => $shopName,
             '{customer_name}' => $customer->firstname . ' ' . $customer->lastname,
             '{customer_email}' => $customerEmail,
             '{ip_address}' => $ip,
@@ -469,6 +473,7 @@ class TelegramNotifier extends Module
     private function getDefaultOrderTemplate()
     {
         return "🆕 New order #{order_reference}\n" .
+            "🏪 Shop: {shop_name}\n" .
             "👤 Customer: {customer_name}\n" .
             "📧 Email: {customer_email}\n" .
             "🌐 IP: {ip_address}\n" .
@@ -688,7 +693,7 @@ class TelegramNotifier extends Module
                         'cols' => 60,
                         'rows' => 10,
                         'required' => true,
-                        'desc' => $this->l('Available placeholders: {order_reference}, {customer_name}, {customer_email}, {ip_address}, {country}, {date_time}, {phone_number}, {total_paid}, {shipping_address}, {delivery_method}, {payment_method}, {products_list}, {order_comment}.'),
+                        'desc' => $this->l('Available placeholders: {order_reference}, {shop_name}, {customer_name}, {customer_email}, {ip_address}, {country}, {date_time}, {phone_number}, {total_paid}, {shipping_address}, {delivery_method}, {payment_method}, {products_list}, {order_comment}.'),
                     ],
                     [
                         'type' => 'textarea',

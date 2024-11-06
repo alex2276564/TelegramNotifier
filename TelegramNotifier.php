@@ -107,7 +107,7 @@ class TelegramNotifier extends Module
             $gender = $this->getGenderName($customer->id_gender);
             $newsletter = $customer->newsletter ? '✅' : '❌';
 
-            $birthdayFormatted = !empty($birthday) ? date('Y-m-d', strtotime($birthday)) : 'Не указана';
+            $birthdayFormatted = !empty($birthday) ? date('Y-m-d', strtotime($birthday)) : '';
 
             $message = strtr($this->newCustomerTemplate, [
                 '{customer_name}' => $customer->firstname . ' ' . $customer->lastname,

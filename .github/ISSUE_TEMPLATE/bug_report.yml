@@ -105,5 +105,5 @@ body:
       description: Please provide your module configuration (remove sensitive data like bot token)
       placeholder: |
         - Message template used
-        - Max messages per order setting
+        - Max messages per action setting
         - Other relevant settings

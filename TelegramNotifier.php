@@ -5,16 +5,42 @@ if (!defined('_PS_VERSION_')) {
 
 class TelegramNotifier extends Module
 {
-    // Cached values
-    private $botToken;
-    private $chatIds;
-    private $maxMessages;
-    private $newOrderTemplate;
-    private $adminLoginTemplate;
-    private $newCustomerTemplate;
-    private $updateNotifications;
-    private $newCustomerNotifications;
-    private $adminLoginNotifications;
+    private $configCache = [];
+
+    private $configTypes = [
+        'TELEGRAMNOTIFY_MAX_MESSAGES' => 'int',
+        'TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS' => 'bool',
+        'TELEGRAMNOTIFY_NEW_CUSTOMER_NOTIFICATIONS' => 'bool',
+        'TELEGRAMNOTIFY_ADMIN_LOGIN_NOTIFICATIONS' => 'bool',
+    ];
+
+    private function getFromCache($key)
+    {
+        // If the value is in the cache - return it
+        if (isset($this->configCache[$key])) {
+            return $this->configCache[$key];
+        }
+
+        // If not - get from the database and save to cache
+        $value = $this->getConfigValue($key);
+
+        // In PrestaShop, configuration values in the ps_configuration table are stored as strings (in the value column of mediumtext type)
+        if (isset($this->configTypes[$key])) {
+            switch ($this->configTypes[$key]) {
+                case 'int':
+                    $value = (int) $value;
+                    break;
+                case 'bool':
+                    $value = (bool) $value;
+                    break;
+                default:
+                    $value = (string) $value;
+            }
+        }
+    
+        $this->configCache[$key] = $value;
+        return $value;
+    }
 
     public function __construct()
     {
@@ -43,25 +69,31 @@ class TelegramNotifier extends Module
 
     private function setConfigValue($key, $value)
     {
+        $this->configCache[$key] = $value;
+
         return Configuration::updateValue($key, $value);
     }
 
     private function deleteConfigValue($key)
     {
+        unset($this->configCache[$key]);
+
         return Configuration::deleteByName($key);
     }
 
     private function loadConfiguration()
     {
-        $this->botToken = $this->getConfigValue('TELEGRAMNOTIFY_BOT_TOKEN');
-        $this->chatIds = $this->getConfigValue('TELEGRAMNOTIFY_CHAT_ID');
-        $this->maxMessages = (int) $this->getConfigValue('TELEGRAMNOTIFY_MAX_MESSAGES');
-        $this->newOrderTemplate = $this->getConfigValue('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE');
-        $this->adminLoginTemplate = $this->getConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE');
-        $this->newCustomerTemplate = $this->getConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE');
-        $this->updateNotifications = (bool) $this->getConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS');
-        $this->newCustomerNotifications = (bool) $this->getConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_NOTIFICATIONS');
-        $this->adminLoginNotifications = (bool) $this->getConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_NOTIFICATIONS');
+        $this->configCache = [
+            'TELEGRAMNOTIFY_BOT_TOKEN' => $this->getFromCache('TELEGRAMNOTIFY_BOT_TOKEN'),
+            'TELEGRAMNOTIFY_CHAT_ID' => $this->getFromCache('TELEGRAMNOTIFY_CHAT_ID'),
+            'TELEGRAMNOTIFY_MAX_MESSAGES' => (int) $this->getFromCache('TELEGRAMNOTIFY_MAX_MESSAGES'),
+            'TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE' => $this->getFromCache('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE'),
+            'TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE' => $this->getFromCache('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE'),
+            'TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE' => $this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE'),
+            'TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS' => (bool) $this->getFromCache('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS'),
+            'TELEGRAMNOTIFY_NEW_CUSTOMER_NOTIFICATIONS' => (bool) $this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_NOTIFICATIONS'),
+            'TELEGRAMNOTIFY_ADMIN_LOGIN_NOTIFICATIONS' => (bool) $this->getFromCache('TELEGRAMNOTIFY_ADMIN_LOGIN_NOTIFICATIONS')
+        ];
     }
 
     public function install()
@@ -73,7 +105,7 @@ class TelegramNotifier extends Module
             $this->setConfigValue('TELEGRAMNOTIFY_BOT_TOKEN', '') &&
             $this->setConfigValue('TELEGRAMNOTIFY_CHAT_ID', '') &&
             $this->setConfigValue('TELEGRAMNOTIFY_MAX_MESSAGES', 5) &&
-            $this->setConfigValue('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE', $this->getDefaultOrderTemplate()) &&
+            $this->setConfigValue('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE', $this->getDefaultNewOrderTemplate()) &&
             $this->setConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE', $this->getDefaultAdminLoginTemplate()) &&
             $this->setConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE', $this->getDefaultNewCustomerTemplate()) &&
             $this->setConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS', true) &&
@@ -97,8 +129,7 @@ class TelegramNotifier extends Module
 
     public function hookActionCustomerAccountAdd($params)
     {
-        if ($this->newCustomerNotifications) {
-
+        if ($this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_NOTIFICATIONS')) {
             $customer = $params['newCustomer'];
             $ip = Tools::getRemoteAddr();
             $country = $this->getCountryFromIP($ip);
@@ -109,7 +140,8 @@ class TelegramNotifier extends Module
 
             $birthdayFormatted = !empty($birthday) ? date('Y-m-d', strtotime($birthday)) : '';
 
-            $message = strtr($this->newCustomerTemplate, [
+            $newCustomerTemplate = $this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE');
+            $message = strtr($newCustomerTemplate, [
                 '{customer_name}' => $customer->firstname . ' ' . $customer->lastname,
                 '{customer_email}' => $customer->email,
                 '{ip_address}' => $ip,
@@ -126,12 +158,13 @@ class TelegramNotifier extends Module
 
     public function hookActionAdminLoginControllerLoginAfter($params)
     {
-        if ($this->adminLoginNotifications) {
+        if ($this->getFromCache('TELEGRAMNOTIFY_ADMIN_LOGIN_NOTIFICATIONS')) {
             $employee = $params['employee'];
             $ip = Tools::getRemoteAddr();
             $country = $this->getCountryFromIP($ip);
 
-            $message = strtr($this->adminLoginTemplate, [
+            $adminLoginTemplate = $this->getFromCache('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE');
+            $message = strtr($adminLoginTemplate, [
                 '{employee_name}' => $employee->firstname . ' ' . $employee->lastname,
                 '{employee_email}' => $employee->email,
                 '{ip_address}' => $ip,
@@ -181,7 +214,7 @@ class TelegramNotifier extends Module
         $shop = new Shop($order->id_shop);
         $shopName = $shop->name;
 
-        $newOrderTemplate = $this->newOrderTemplate;
+        $newOrderTemplate = $this->getFromCache('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE');
         $message = strtr($newOrderTemplate, [
             '{order_reference}' => $order->reference,
             '{shop_name}' => $shopName,
@@ -203,20 +236,20 @@ class TelegramNotifier extends Module
 
     private function sendTelegramMessage($message)
     {
-        $botToken = $this->botToken;
-        $chatIds = $this->chatIds;
-        $maxMessages = $this->maxMessages;
+        $botToken = $this->getFromCache('TELEGRAMNOTIFY_BOT_TOKEN');
+        $chatIds = $this->getFromCache('TELEGRAMNOTIFY_CHAT_ID');
+        $maxMessages = $this->getFromCache('TELEGRAMNOTIFY_MAX_MESSAGES');
 
         $validate = $this->validateConfigurationData(
             $botToken,
             $chatIds,
             $maxMessages,
-            $this->newOrderTemplate,
-            $this->adminLoginTemplate,
-            $this->newCustomerTemplate,
-            $this->updateNotifications,
-            $this->adminLoginNotifications,
-            $this->newCustomerNotifications
+            $this->getFromCache('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE'),
+            $this->getFromCache('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE'),
+            $this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE'),
+            $this->getFromCache('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS'),
+            $this->getFromCache('TELEGRAMNOTIFY_ADMIN_LOGIN_NOTIFICATIONS'),
+            $this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_NOTIFICATIONS')
         );
         if (is_array($validate) && isset($validate[0])) {
             $this->logError('Invalid configuration: ' . json_encode($validate));
@@ -225,9 +258,9 @@ class TelegramNotifier extends Module
 
         $chatIdsArray = array_map('trim', explode(',', $chatIds));
 
-        // Adding an update notification to the beginning of a message
+        // Add an update notification at the beginning of the message
         $newVersion = $this->checkForUpdates();
-        if ($newVersion && (bool) $this->updateNotifications) {
+        if ($newVersion && (bool) $this->getFromCache('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS')) {
             $updateMessage = '🎉 ' . $this->l('A new version of TelegramNotifier is available! Update to') . ' ' . $newVersion . ' ' . $this->l('to get the latest features and bug fixes.') . "\n";
             $updateMessage .= $this->l('Download:') . ' https://github.com/alex2276564/TelegramNotifier/releases/latest' . "\n\n";
             $message = $updateMessage . $message;
@@ -278,7 +311,7 @@ class TelegramNotifier extends Module
         return $success;
     }
 
-    //Splits a message into parts if its length exceeds the maximum allowed length
+    // Splits a message into parts if its length exceeds the maximum allowed length
     private function splitMessage($message, $maxLength = 4096)
     {
         if (mb_strlen($message, 'UTF-8') <= $maxLength) {
@@ -420,7 +453,7 @@ class TelegramNotifier extends Module
         }
 
         if (empty($newOrderTemplate)) {
-            $newOrderTemplate = $this->getDefaultOrderTemplate();
+            $newOrderTemplate = $this->getDefaultNewOrderTemplate();
             $default = true;
         }
 
@@ -470,7 +503,7 @@ class TelegramNotifier extends Module
         );
     }
 
-    private function getDefaultOrderTemplate()
+    private function getDefaultNewOrderTemplate()
     {
         return "🆕 New order #{order_reference}\n" .
             "🏪 Shop: {shop_name}\n" .
@@ -511,7 +544,6 @@ class TelegramNotifier extends Module
             "👫 Gender: {gender}\n" .
             "📰 Subscribed to newsletter: {newsletter}";
     }
-
 
     private function getCountryFromIP($ip)
     {
@@ -624,9 +656,6 @@ class TelegramNotifier extends Module
                 $this->setConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS', $updateNotifications);
                 $this->setConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_NOTIFICATIONS', $newCustomerNotifications);
                 $this->setConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_NOTIFICATIONS', $adminLoginNotifications);
-
-                // Reload configuration
-                $this->loadConfiguration();
 
                 $output .= $this->displayConfirmation($this->l('Settings updated'));
                 if ($validationResult['default']) {
@@ -801,7 +830,7 @@ class TelegramNotifier extends Module
 
         foreach ($fields_form['form']['input'] as $input) {
             if (isset($input['name'])) {
-                $helper->fields_value[$input['name']] = $this->getConfigValue($input['name']);
+                $helper->fields_value[$input['name']] = $this->getFromCache($input['name']);
             }
         }
 

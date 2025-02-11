@@ -10,6 +10,8 @@ class TelegramNotifier extends Module
     private $configTypes = [
         'TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS' => 'bool',
         'TELEGRAMNOTIFY_MAX_MESSAGES' => 'int',
+        'TELEGRAMNOTIFY_MAX_RETRIES' => 'int',
+
     ];
 
     private function getFromCache($key)
@@ -88,6 +90,7 @@ class TelegramNotifier extends Module
             'TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID' => $this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID'),
             'TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS' => (bool) $this->getFromCache('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS'),
             'TELEGRAMNOTIFY_MAX_MESSAGES' => (int) $this->getFromCache('TELEGRAMNOTIFY_MAX_MESSAGES'),
+            'TELEGRAMNOTIFY_MAX_RETRIES' => (int) $this->getFromCache('TELEGRAMNOTIFY_MAX_RETRIES'),
             'TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE' => $this->getFromCache('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE'),
             'TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE' => $this->getFromCache('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE'),
             'TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE' => $this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE')
@@ -106,6 +109,7 @@ class TelegramNotifier extends Module
             $this->setConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID', '') &&
             $this->setConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS', true) &&
             $this->setConfigValue('TELEGRAMNOTIFY_MAX_MESSAGES', 5) &&
+            $this->setConfigValue('TELEGRAMNOTIFY_MAX_RETRIES', 0) &&
             $this->setConfigValue('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE', $this->getDefaultNewOrderTemplate()) &&
             $this->setConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE', $this->getDefaultAdminLoginTemplate()) &&
             $this->setConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE', $this->getDefaultNewCustomerTemplate());
@@ -120,6 +124,7 @@ class TelegramNotifier extends Module
             $this->deleteConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID') &&
             $this->deleteConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS') &&
             $this->deleteConfigValue('TELEGRAMNOTIFY_MAX_MESSAGES') &&
+            $this->deleteConfigValue('TELEGRAMNOTIFY_MAX_RETRIES') &&
             $this->deleteConfigValue('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE') &&
             $this->deleteConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE') &&
             $this->deleteConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE');
@@ -348,6 +353,7 @@ class TelegramNotifier extends Module
     private function sendTelegramMessage($message, $notificationType)
     {
         $botToken = $this->getFromCache('TELEGRAMNOTIFY_BOT_TOKEN');
+        $maxRetries = (int) $this->getFromCache('TELEGRAMNOTIFY_MAX_RETRIES');
 
         switch ($notificationType) {
             case 'order':
@@ -376,6 +382,7 @@ class TelegramNotifier extends Module
             $this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID'),
             $this->getFromCache('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS'),
             $maxMessages,
+            $maxRetries,
             $this->getFromCache('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE'),
             $this->getFromCache('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE'),
             $this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE')
@@ -422,23 +429,57 @@ class TelegramNotifier extends Module
             return false;
         }
 
-        $results = $this->executeCurlRequest($urls, $postData, [], true);
+        if ($maxRetries === 0) {
+            $results = $this->executeCurlRequest($urls, $postData, [], true);
+            $success = true;
 
-        $success = true;
-        foreach ($results as $result) {
-            if ($result['error']) {
-                $this->logError('Failed to send Telegram message: ' . $result['error']);
-                $success = false;
-            } else {
-                $responseData = json_decode($result['result'], true);
-                if (!isset($responseData['ok']) || $responseData['ok'] !== true) {
-                    $this->logError('Telegram API error: ' . ($responseData['description'] ?? 'Unknown error'));
+            foreach ($results as $result) {
+                if ($result['error']) {
+                    $this->logError('Failed to send Telegram message: ' . $result['error']);
                     $success = false;
+                } else {
+                    $responseData = json_decode($result['result'], true);
+                    if (!isset($responseData['ok']) || $responseData['ok'] !== true) {
+                        $this->logError('Telegram API error: ' . ($responseData['description'] ?? 'Unknown error'));
+                        $success = false;
+                    }
                 }
+                // Telegram rate limiting (add a delay (1 second) between messages)
+                sleep(1);
             }
-            // Telegram rate limiting (add a delay (1 second) between messages)
-            sleep(1);
+
+            return $success;
         }
+
+        $attempt = 0;
+        $success = false;
+
+        while ($attempt < $maxRetries) {
+            $results = $this->executeCurlRequest($urls, $postData, [], true);
+            $success = true;
+
+            foreach ($results as $result) {
+                if ($result['error']) {
+                    $this->logError('Attempt ' . ($attempt + 1) . ': Failed to send Telegram message: ' . $result['error']);
+                    $success = false;
+                } else {
+                    $responseData = json_decode($result['result'], true);
+                    if (!isset($responseData['ok']) || $responseData['ok'] !== true) {
+                        $this->logError('Attempt ' . ($attempt + 1) . ': Telegram API error: ' . ($responseData['description'] ?? 'Unknown error'));
+                        $success = false;
+                    }
+                }
+                // Telegram rate limiting (add a delay (1 second) between messages)
+                sleep(1);
+            }
+
+            if ($success) {
+                break;
+            }
+
+            $attempt++;
+        }
+
         return $success;
     }
 
@@ -572,7 +613,7 @@ class TelegramNotifier extends Module
         return implode("\n", $parts);
     }
 
-    private function validateConfigurationData($botToken, $newOrdersChatId, $adminLoginChatId, $newCustomerChatId, $updateNotifications, $maxMessages, $newOrderTemplate, $adminLoginTemplate, $newCustomerTemplate)
+    private function validateConfigurationData($botToken, $newOrdersChatId, $adminLoginChatId, $newCustomerChatId, $updateNotifications, $maxMessages, $maxRetries, $newOrderTemplate, $adminLoginTemplate, $newCustomerTemplate)
     {
         $errors = [];
         $default = false;
@@ -595,6 +636,10 @@ class TelegramNotifier extends Module
 
         if (!is_numeric($maxMessages) || $maxMessages < 0 || !ctype_digit(strval($maxMessages))) {
             $errors[] = $this->l('Max Messages must be a non-negative integer.');
+        }
+
+        if (!is_numeric($maxRetries) || $maxRetries < 0 || !ctype_digit(strval($maxRetries))) {
+            $errors[] = $this->l('Max Retry Attempts must be a non-negative integer.');
         }
 
         if (empty($newOrderTemplate)) {
@@ -773,6 +818,7 @@ class TelegramNotifier extends Module
             $newCustomerChatId = $getConfigValueFromForm('TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID');
             $updateNotifications = (bool) $getConfigValueFromForm('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS');
             $maxMessages = $getConfigValueFromForm('TELEGRAMNOTIFY_MAX_MESSAGES');
+            $maxRetries = $getConfigValueFromForm('TELEGRAMNOTIFY_MAX_RETRIES');
             $newOrderTemplate = $getConfigValueFromForm('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE');
             $adminLoginTemplate = $getConfigValueFromForm('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE');
             $newCustomerTemplate = $getConfigValueFromForm('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE');
@@ -784,6 +830,7 @@ class TelegramNotifier extends Module
                 $newCustomerChatId,
                 $updateNotifications,
                 $maxMessages,
+                $maxRetries,
                 $newOrderTemplate,
                 $adminLoginTemplate,
                 $newCustomerTemplate
@@ -796,6 +843,7 @@ class TelegramNotifier extends Module
                 $this->setConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID', $newCustomerChatId);
                 $this->setConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS', $updateNotifications);
                 $this->setConfigValue('TELEGRAMNOTIFY_MAX_MESSAGES', $maxMessages);
+                $this->setConfigValue('TELEGRAMNOTIFY_MAX_RETRIES', $maxRetries);
                 $this->setConfigValue('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE', $validationResult['newOrderTemplate']);
                 $this->setConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE', $validationResult['adminLoginTemplate']);
                 $this->setConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE', $validationResult['newCustomerTemplate']);
@@ -892,6 +940,14 @@ class TelegramNotifier extends Module
                         'size' => 5,
                         'required' => true,
                         'desc' => $this->l('Enter the maximum number of messages to send per action (0 for unlimited).')
+                    ],
+                    [
+                        'type' => 'text',
+                        'label' => $this->l('Max Retry Attempts'),
+                        'name' => 'TELEGRAMNOTIFY_MAX_RETRIES',
+                        'size' => 5,
+                        'required' => true,
+                        'desc' => $this->l('Number of retry attempts for sending messages (0 to disable, recommended for stable connections).')
                     ],
                     [
                         'type' => 'textarea',

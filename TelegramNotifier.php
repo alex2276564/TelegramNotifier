@@ -259,11 +259,13 @@ class TelegramNotifier extends Module
         $chatIdsArray = array_map('trim', explode(',', $chatIds));
 
         // Add an update notification at the beginning of the message
-        $newVersion = $this->checkForUpdates();
-        if ($newVersion && (bool) $this->getFromCache('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS')) {
-            $updateMessage = '🎉 ' . $this->l('A new version of TelegramNotifier is available! Update to') . ' ' . $newVersion . ' ' . $this->l('to get the latest features and bug fixes.') . "\n";
-            $updateMessage .= $this->l('Download:') . ' https://github.com/alex2276564/TelegramNotifier/releases/latest' . "\n\n";
-            $message = $updateMessage . $message;
+        if ((bool) $this->getFromCache('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS')) {
+            $newVersion = $this->checkForUpdates();
+            if ($newVersion) {
+                $updateMessage = '🎉 ' . $this->l('A new version of TelegramNotifier is available! Update to') . ' ' . $newVersion . ' ' . $this->l('to get the latest features and bug fixes.') . "\n";
+                $updateMessage .= $this->l('Download:') . ' https://github.com/alex2276564/TelegramNotifier/releases/latest' . "\n\n";
+                $message = $updateMessage . $message;
+            }
         }
 
         $messageParts = $this->splitMessage($message);

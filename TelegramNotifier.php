@@ -24,7 +24,10 @@ class TelegramNotifier extends Module
         // If not - get from the database and save to cache
         $value = $this->getConfigValue($key);
 
-        // In PrestaShop, configuration values in the ps_configuration table are stored as strings (in the value column of mediumtext type)
+        // In PrestaShop, configuration values are stored as strings in the 'value' column of the 'ps_configuration' table.
+        // This column is of type 'mediumtext', meaning that any configuration value, regardless of its original type (e.g., boolean, integer),
+        // is stored as a string. Therefore, we need to convert these values back to their intended types when retrieving them.
+        // The conversion is based on the predefined types specified in the $configTypes array.
         if (isset($this->configTypes[$key])) {
             switch ($this->configTypes[$key]) {
                 case 'int':
@@ -322,14 +325,21 @@ class TelegramNotifier extends Module
             if (strpos($newOrderTemplate, '{products_list}') !== false) {
                 $productslist = '';
                 $products = $order->getProducts();
+                $currency = new Currency($order->id_currency);
 
                 foreach ($products as $product) {
                     $attributes = isset($product['attributes']) && !empty($product['attributes'])
                         ? " (" . $product['attributes'] . ")"
                         : "";
                     $productName = $product['product_name'];
+
+                    $productPrice = $product['unit_price_tax_incl'];
+
+                    $formattedPrice = Tools::displayPrice($productPrice, $currency);
+
                     $productslist .= "- " . $productName . $attributes .
-                        " x " . (int) $product['product_quantity'] . "\n";
+                        " x " . (int) $product['product_quantity'] .
+                        " (" . $formattedPrice . ")\n";
                 }
                 $placeholders['{products_list}'] = $productslist;
             }

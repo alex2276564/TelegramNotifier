@@ -37,7 +37,7 @@ class TelegramNotifier extends Module
                     $value = (string) $value;
             }
         }
-    
+
         $this->configCache[$key] = $value;
         return $value;
     }
@@ -131,26 +131,57 @@ class TelegramNotifier extends Module
     {
         if ($this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_NOTIFICATIONS')) {
             $customer = $params['newCustomer'];
-            $ip = Tools::getRemoteAddr();
-            $country = $this->getCountryFromIP($ip);
-
-            $birthday = $customer->birthday;
-            $gender = $this->getGenderName($customer->id_gender);
-            $newsletter = $customer->newsletter ? '✅' : '❌';
-
-            $birthdayFormatted = !empty($birthday) ? date('Y-m-d', strtotime($birthday)) : '';
-
             $newCustomerTemplate = $this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE');
-            $message = strtr($newCustomerTemplate, [
-                '{customer_name}' => $customer->firstname . ' ' . $customer->lastname,
-                '{customer_email}' => $customer->email,
-                '{ip_address}' => $ip,
-                '{country}' => $country,
-                '{date_time}' => date('Y-m-d H:i:s'),
-                '{birthday}' => $birthdayFormatted,
-                '{gender}' => $gender,
-                '{newsletter}' => $newsletter,
-            ]);
+
+            $placeholders = [
+                '{customer_name}' => '',
+                '{customer_email}' => '',
+                '{ip_address}' => '',
+                '{country}' => '',
+                '{date_time}' => '',
+                '{birthday}' => '',
+                '{gender}' => '',
+                '{newsletter}' => '',
+            ];
+
+            if (strpos($newCustomerTemplate, '{customer_name}') !== false) {
+                $placeholders['{customer_name}'] = $customer->firstname . ' ' . $customer->lastname;
+            }
+
+            if (strpos($newCustomerTemplate, '{customer_email}') !== false) {
+                $placeholders['{customer_email}'] = $customer->email;
+            }
+
+            if (strpos($newCustomerTemplate, '{ip_address}') !== false || strpos($newCustomerTemplate, '{country}') !== false) {
+                $ip = Tools::getRemoteAddr();
+
+                if (strpos($newCustomerTemplate, '{ip_address}') !== false) {
+                    $placeholders['{ip_address}'] = $ip;
+                }
+
+                if (strpos($newCustomerTemplate, '{country}') !== false) {
+                    $placeholders['{country}'] = $this->getCountryFromIP($ip);
+                }
+            }
+
+            if (strpos($newCustomerTemplate, '{date_time}') !== false) {
+                $placeholders['{date_time}'] = date('Y-m-d H:i:s');
+            }
+
+            if (strpos($newCustomerTemplate, '{birthday}') !== false) {
+                $birthday = $customer->birthday;
+                $placeholders['{birthday}'] = !empty($birthday) ? date('Y-m-d', strtotime($birthday)) : '';
+            }
+
+            if (strpos($newCustomerTemplate, '{gender}') !== false) {
+                $placeholders['{gender}'] = $this->getGenderName($customer->id_gender);
+            }
+
+            if (strpos($newCustomerTemplate, '{newsletter}') !== false) {
+                $placeholders['{newsletter}'] = $customer->newsletter ? '✅' : '❌';
+            }
+
+            $message = strtr($newCustomerTemplate, $placeholders);
 
             $this->sendTelegramMessage($message);
         }
@@ -160,17 +191,41 @@ class TelegramNotifier extends Module
     {
         if ($this->getFromCache('TELEGRAMNOTIFY_ADMIN_LOGIN_NOTIFICATIONS')) {
             $employee = $params['employee'];
-            $ip = Tools::getRemoteAddr();
-            $country = $this->getCountryFromIP($ip);
-
             $adminLoginTemplate = $this->getFromCache('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE');
-            $message = strtr($adminLoginTemplate, [
-                '{employee_name}' => $employee->firstname . ' ' . $employee->lastname,
-                '{employee_email}' => $employee->email,
-                '{ip_address}' => $ip,
-                '{country}' => $country,
-                '{date_time}' => date('Y-m-d H:i:s'),
-            ]);
+
+            $placeholders = [
+                '{employee_name}' => '',
+                '{employee_email}' => '',
+                '{ip_address}' => '',
+                '{country}' => '',
+                '{date_time}' => '',
+            ];
+
+            if (strpos($adminLoginTemplate, '{employee_name}') !== false) {
+                $placeholders['{employee_name}'] = $employee->firstname . ' ' . $employee->lastname;
+            }
+
+            if (strpos($adminLoginTemplate, '{employee_email}') !== false) {
+                $placeholders['{employee_email}'] = $employee->email;
+            }
+
+            if (strpos($adminLoginTemplate, '{ip_address}') !== false || strpos($adminLoginTemplate, '{country}') !== false) {
+                $ip = Tools::getRemoteAddr();
+
+                if (strpos($adminLoginTemplate, '{ip_address}') !== false) {
+                    $placeholders['{ip_address}'] = $ip;
+                }
+
+                if (strpos($adminLoginTemplate, '{country}') !== false) {
+                    $placeholders['{country}'] = $this->getCountryFromIP($ip);
+                }
+            }
+
+            if (strpos($adminLoginTemplate, '{date_time}') !== false) {
+                $placeholders['{date_time}'] = date('Y-m-d H:i:s');
+            }
+
+            $message = strtr($adminLoginTemplate, $placeholders);
 
             $this->sendTelegramMessage($message);
         }
@@ -182,55 +237,111 @@ class TelegramNotifier extends Module
         $customer = new Customer($order->id_customer);
         $address = new Address($order->id_address_delivery);
 
-        $phoneNumber = !empty($address->phone_mobile) ? $address->phone_mobile : $address->phone;
+        $newOrderTemplate = $this->getFromCache('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE');
 
-        $customerEmail = $customer->email;
+        $placeholders = [
+            '{order_reference}' => '',
+            '{shop_name}' => '',
+            '{customer_name}' => '',
+            '{customer_email}' => '',
+            '{ip_address}' => '',
+            '{country}' => '',
+            '{date_time}' => '',
+            '{phone_number}' => '',
+            '{total_paid}' => '',
+            '{shipping_address}' => '',
+            '{delivery_method}' => '',
+            '{payment_method}' => '',
+            '{products_list}' => '',
+            '{order_comment}' => '',
+        ];
 
-        $ip = Tools::getRemoteAddr();
-        $country = $this->getCountryFromIP($ip);
+        if (strpos($newOrderTemplate, '{order_reference}') !== false) {
+            $placeholders['{order_reference}'] = $order->reference;
+        }
 
-        $dateTime = date('Y-m-d H:i:s');
+        if (strpos($newOrderTemplate, '{shop_name}') !== false) {
+            $shop = new Shop($order->id_shop);
+            $placeholders['{shop_name}'] = $shop->name;
+        }
 
-        $orderMessage = '';
-        if ($order->id) {
-            $orderMessages = Message::getMessagesByOrderId((int) $order->id);
-            if (!empty($orderMessages)) {
-                $orderMessage = $orderMessages[0]['message'];
+        if (strpos($newOrderTemplate, '{customer_name}') !== false) {
+            $placeholders['{customer_name}'] = $customer->firstname . ' ' . $customer->lastname;
+        }
+
+        if (strpos($newOrderTemplate, '{customer_email}') !== false) {
+            $placeholders['{customer_email}'] = $customer->email;
+        }
+
+        if (strpos($newOrderTemplate, '{ip_address}') !== false || strpos($newOrderTemplate, '{country}') !== false) {
+            $ip = Tools::getRemoteAddr();
+
+            if (strpos($newOrderTemplate, '{ip_address}') !== false) {
+                $placeholders['{ip_address}'] = $ip;
+            }
+
+            if (strpos($newOrderTemplate, '{country}') !== false) {
+                $placeholders['{country}'] = $this->getCountryFromIP($ip);
             }
         }
 
-        $carrier = new Carrier($order->id_carrier);
-        $deliveryMethod = $carrier->name;
-
-        $productslist = '';
-        $products = $order->getProducts();
-
-        foreach ($products as $product) {
-            $attributes = isset($product['attributes']) && !empty($product['attributes']) ? " (" . $product['attributes'] . ")" : "";
-            $productName = $product['product_name'];
-            $productslist .= "- " . $productName . $attributes . " x " . (int) $product['product_quantity'] . "\n";
+        if (strpos($newOrderTemplate, '{date_time}') !== false) {
+            $placeholders['{date_time}'] = date('Y-m-d H:i:s');
         }
 
-        $shop = new Shop($order->id_shop);
-        $shopName = $shop->name;
+        if (strpos($newOrderTemplate, '{phone_number}') !== false) {
+            $placeholders['{phone_number}'] = !empty($address->phone_mobile) ?
+                $address->phone_mobile : $address->phone;
+        }
 
-        $newOrderTemplate = $this->getFromCache('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE');
-        $message = strtr($newOrderTemplate, [
-            '{order_reference}' => $order->reference,
-            '{shop_name}' => $shopName,
-            '{customer_name}' => $customer->firstname . ' ' . $customer->lastname,
-            '{customer_email}' => $customerEmail,
-            '{ip_address}' => $ip,
-            '{country}' => $country,
-            '{date_time}' => $dateTime,
-            '{phone_number}' => $phoneNumber,
-            '{total_paid}' => Tools::displayPrice($order->getOrdersTotalPaid(), $order->id_currency, false),
-            '{shipping_address}' => $this->formatShippingAddress($address),
-            '{delivery_method}' => $deliveryMethod,
-            '{payment_method}' => $order->payment,
-            '{products_list}' => $productslist,
-            '{order_comment}' => $orderMessage,
-        ]);
+        if (strpos($newOrderTemplate, '{total_paid}') !== false) {
+            $placeholders['{total_paid}'] = Tools::displayPrice(
+                $order->getOrdersTotalPaid(),
+                $order->id_currency,
+                false
+            );
+        }
+
+        if (strpos($newOrderTemplate, '{shipping_address}') !== false) {
+            $placeholders['{shipping_address}'] = $this->formatShippingAddress($address);
+        }
+
+        if (strpos($newOrderTemplate, '{delivery_method}') !== false) {
+            $carrier = new Carrier($order->id_carrier);
+            $placeholders['{delivery_method}'] = $carrier->name;
+        }
+
+        if (strpos($newOrderTemplate, '{payment_method}') !== false) {
+            $placeholders['{payment_method}'] = $order->payment;
+        }
+
+        if (strpos($newOrderTemplate, '{products_list}') !== false) {
+            $productslist = '';
+            $products = $order->getProducts();
+
+            foreach ($products as $product) {
+                $attributes = isset($product['attributes']) && !empty($product['attributes'])
+                    ? " (" . $product['attributes'] . ")"
+                    : "";
+                $productName = $product['product_name'];
+                $productslist .= "- " . $productName . $attributes .
+                    " x " . (int) $product['product_quantity'] . "\n";
+            }
+            $placeholders['{products_list}'] = $productslist;
+        }
+
+        if (strpos($newOrderTemplate, '{order_comment}') !== false) {
+            $orderMessage = '';
+            if ($order->id) {
+                $orderMessages = Message::getMessagesByOrderId((int) $order->id);
+                if (!empty($orderMessages)) {
+                    $orderMessage = $orderMessages[0]['message'];
+                }
+            }
+            $placeholders['{order_comment}'] = $orderMessage;
+        }
+
+        $message = strtr($newOrderTemplate, $placeholders);
         $this->sendTelegramMessage($message);
     }
 

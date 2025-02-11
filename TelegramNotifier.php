@@ -528,17 +528,30 @@ class TelegramNotifier extends Module
 
     private function formatShippingAddress($address)
     {
-        $formattedAddress = $address->address1;
-        if (!empty($address->address2)) {
-            $formattedAddress .= ", " . $address->address2;
-        }
-        $formattedAddress .= "\n" . $address->postcode . " " . $address->city;
-        if (!empty($address->state)) {
-            $formattedAddress .= ", " . $address->state;
-        }
-        $formattedAddress .= "\n" . $address->country;
+        $fields = [
+            'company' => '🏢 ',
+            'vat_number' => '📝 ',
+            'address1' => '📍 ',
+            'address2' => '📍2️⃣ ',
+            'postcode' => '📮 ',
+            'city' => '🏙️ ',
+            'state' => '🏛️ ',
+            'country' => '🌍 '
+        ];
 
-        return $formattedAddress;
+        $parts = [];
+        foreach ($fields as $field => $emoji) {
+            if (!empty($address->$field)) {
+                $parts[$field] = $emoji . $address->$field;
+            }
+        }
+
+        if (isset($parts['city']) && isset($parts['postcode'])) {
+            $parts['city'] = $parts['postcode'] . ' ' . $parts['city'];
+            unset($parts['postcode']);
+        }
+
+        return implode("\n", $parts);
     }
 
     private function validateConfigurationData($botToken, $chatIds, $maxMessages, $newOrderTemplate, $adminLoginTemplate, $newCustomerTemplate, $updateNotifications, $adminLoginNotifications, $newCustomerNotifications)

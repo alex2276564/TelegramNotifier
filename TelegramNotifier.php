@@ -8,10 +8,8 @@ class TelegramNotifier extends Module
     private $configCache = [];
 
     private $configTypes = [
-        'TELEGRAMNOTIFY_MAX_MESSAGES' => 'int',
         'TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS' => 'bool',
-        'TELEGRAMNOTIFY_NEW_CUSTOMER_NOTIFICATIONS' => 'bool',
-        'TELEGRAMNOTIFY_ADMIN_LOGIN_NOTIFICATIONS' => 'bool',
+        'TELEGRAMNOTIFY_MAX_MESSAGES' => 'int',
     ];
 
     private function getFromCache($key)
@@ -85,14 +83,14 @@ class TelegramNotifier extends Module
     {
         $this->configCache = [
             'TELEGRAMNOTIFY_BOT_TOKEN' => $this->getFromCache('TELEGRAMNOTIFY_BOT_TOKEN'),
-            'TELEGRAMNOTIFY_CHAT_ID' => $this->getFromCache('TELEGRAMNOTIFY_CHAT_ID'),
+            'TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID' => $this->getFromCache('TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID'),
+            'TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID' => $this->getFromCache('TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID'),
+            'TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID' => $this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID'),
+            'TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS' => (bool) $this->getFromCache('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS'),
             'TELEGRAMNOTIFY_MAX_MESSAGES' => (int) $this->getFromCache('TELEGRAMNOTIFY_MAX_MESSAGES'),
             'TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE' => $this->getFromCache('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE'),
             'TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE' => $this->getFromCache('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE'),
-            'TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE' => $this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE'),
-            'TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS' => (bool) $this->getFromCache('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS'),
-            'TELEGRAMNOTIFY_NEW_CUSTOMER_NOTIFICATIONS' => (bool) $this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_NOTIFICATIONS'),
-            'TELEGRAMNOTIFY_ADMIN_LOGIN_NOTIFICATIONS' => (bool) $this->getFromCache('TELEGRAMNOTIFY_ADMIN_LOGIN_NOTIFICATIONS')
+            'TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE' => $this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE')
         ];
     }
 
@@ -103,33 +101,33 @@ class TelegramNotifier extends Module
             $this->registerHook('actionAdminLoginControllerLoginAfter') &&
             $this->registerHook('actionCustomerAccountAdd') &&
             $this->setConfigValue('TELEGRAMNOTIFY_BOT_TOKEN', '') &&
-            $this->setConfigValue('TELEGRAMNOTIFY_CHAT_ID', '') &&
+            $this->setConfigValue('TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID', '') &&
+            $this->setConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID', '') &&
+            $this->setConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID', '') &&
+            $this->setConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS', true) &&
             $this->setConfigValue('TELEGRAMNOTIFY_MAX_MESSAGES', 5) &&
             $this->setConfigValue('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE', $this->getDefaultNewOrderTemplate()) &&
             $this->setConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE', $this->getDefaultAdminLoginTemplate()) &&
-            $this->setConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE', $this->getDefaultNewCustomerTemplate()) &&
-            $this->setConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS', true) &&
-            $this->setConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_NOTIFICATIONS', false) &&
-            $this->setConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_NOTIFICATIONS', true);
+            $this->setConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE', $this->getDefaultNewCustomerTemplate());
     }
 
     public function uninstall()
     {
         return parent::uninstall() &&
             $this->deleteConfigValue('TELEGRAMNOTIFY_BOT_TOKEN') &&
-            $this->deleteConfigValue('TELEGRAMNOTIFY_CHAT_ID') &&
+            $this->deleteConfigValue('TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID') &&
+            $this->deleteConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID') &&
+            $this->deleteConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID') &&
+            $this->deleteConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS') &&
             $this->deleteConfigValue('TELEGRAMNOTIFY_MAX_MESSAGES') &&
             $this->deleteConfigValue('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE') &&
             $this->deleteConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE') &&
-            $this->deleteConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE') &&
-            $this->deleteConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS') &&
-            $this->deleteConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_NOTIFICATIONS') &&
-            $this->deleteConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_NOTIFICATIONS');
+            $this->deleteConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE');
     }
 
     public function hookActionCustomerAccountAdd($params)
     {
-        if ($this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_NOTIFICATIONS')) {
+        if (!empty($this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID'))) {
             $customer = $params['newCustomer'];
             $newCustomerTemplate = $this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE');
 
@@ -183,13 +181,13 @@ class TelegramNotifier extends Module
 
             $message = strtr($newCustomerTemplate, $placeholders);
 
-            $this->sendTelegramMessage($message);
+            $this->sendTelegramMessage($message, 'new_customer');
         }
     }
 
     public function hookActionAdminLoginControllerLoginAfter($params)
     {
-        if ($this->getFromCache('TELEGRAMNOTIFY_ADMIN_LOGIN_NOTIFICATIONS')) {
+        if (!empty($this->getFromCache('TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID'))) {
             $employee = $params['employee'];
             $adminLoginTemplate = $this->getFromCache('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE');
 
@@ -227,140 +225,160 @@ class TelegramNotifier extends Module
 
             $message = strtr($adminLoginTemplate, $placeholders);
 
-            $this->sendTelegramMessage($message);
+            $this->sendTelegramMessage($message, 'admin_login');
         }
     }
 
     public function hookActionValidateOrder($params)
     {
-        $order = $params['order'];
-        $customer = new Customer($order->id_customer);
-        $address = new Address($order->id_address_delivery);
+        if (!empty($this->getFromCache('TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID'))) {
+            $order = $params['order'];
+            $customer = new Customer($order->id_customer);
+            $address = new Address($order->id_address_delivery);
 
-        $newOrderTemplate = $this->getFromCache('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE');
+            $newOrderTemplate = $this->getFromCache('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE');
 
-        $placeholders = [
-            '{order_reference}' => '',
-            '{shop_name}' => '',
-            '{customer_name}' => '',
-            '{customer_email}' => '',
-            '{ip_address}' => '',
-            '{country}' => '',
-            '{date_time}' => '',
-            '{phone_number}' => '',
-            '{total_paid}' => '',
-            '{shipping_address}' => '',
-            '{delivery_method}' => '',
-            '{payment_method}' => '',
-            '{products_list}' => '',
-            '{order_comment}' => '',
-        ];
+            $placeholders = [
+                '{order_reference}' => '',
+                '{shop_name}' => '',
+                '{customer_name}' => '',
+                '{customer_email}' => '',
+                '{ip_address}' => '',
+                '{country}' => '',
+                '{date_time}' => '',
+                '{phone_number}' => '',
+                '{total_paid}' => '',
+                '{shipping_address}' => '',
+                '{delivery_method}' => '',
+                '{payment_method}' => '',
+                '{products_list}' => '',
+                '{order_comment}' => '',
+            ];
 
-        if (strpos($newOrderTemplate, '{order_reference}') !== false) {
-            $placeholders['{order_reference}'] = $order->reference;
-        }
-
-        if (strpos($newOrderTemplate, '{shop_name}') !== false) {
-            $shop = new Shop($order->id_shop);
-            $placeholders['{shop_name}'] = $shop->name;
-        }
-
-        if (strpos($newOrderTemplate, '{customer_name}') !== false) {
-            $placeholders['{customer_name}'] = $customer->firstname . ' ' . $customer->lastname;
-        }
-
-        if (strpos($newOrderTemplate, '{customer_email}') !== false) {
-            $placeholders['{customer_email}'] = $customer->email;
-        }
-
-        if (strpos($newOrderTemplate, '{ip_address}') !== false || strpos($newOrderTemplate, '{country}') !== false) {
-            $ip = Tools::getRemoteAddr();
-
-            if (strpos($newOrderTemplate, '{ip_address}') !== false) {
-                $placeholders['{ip_address}'] = $ip;
+            if (strpos($newOrderTemplate, '{order_reference}') !== false) {
+                $placeholders['{order_reference}'] = $order->reference;
             }
 
-            if (strpos($newOrderTemplate, '{country}') !== false) {
-                $placeholders['{country}'] = $this->getCountryFromIP($ip);
+            if (strpos($newOrderTemplate, '{shop_name}') !== false) {
+                $shop = new Shop($order->id_shop);
+                $placeholders['{shop_name}'] = $shop->name;
             }
-        }
 
-        if (strpos($newOrderTemplate, '{date_time}') !== false) {
-            $placeholders['{date_time}'] = date('Y-m-d H:i:s');
-        }
-
-        if (strpos($newOrderTemplate, '{phone_number}') !== false) {
-            $placeholders['{phone_number}'] = !empty($address->phone_mobile) ?
-                $address->phone_mobile : $address->phone;
-        }
-
-        if (strpos($newOrderTemplate, '{total_paid}') !== false) {
-            $placeholders['{total_paid}'] = Tools::displayPrice(
-                $order->getOrdersTotalPaid(),
-                $order->id_currency,
-                false
-            );
-        }
-
-        if (strpos($newOrderTemplate, '{shipping_address}') !== false) {
-            $placeholders['{shipping_address}'] = $this->formatShippingAddress($address);
-        }
-
-        if (strpos($newOrderTemplate, '{delivery_method}') !== false) {
-            $carrier = new Carrier($order->id_carrier);
-            $placeholders['{delivery_method}'] = $carrier->name;
-        }
-
-        if (strpos($newOrderTemplate, '{payment_method}') !== false) {
-            $placeholders['{payment_method}'] = $order->payment;
-        }
-
-        if (strpos($newOrderTemplate, '{products_list}') !== false) {
-            $productslist = '';
-            $products = $order->getProducts();
-
-            foreach ($products as $product) {
-                $attributes = isset($product['attributes']) && !empty($product['attributes'])
-                    ? " (" . $product['attributes'] . ")"
-                    : "";
-                $productName = $product['product_name'];
-                $productslist .= "- " . $productName . $attributes .
-                    " x " . (int) $product['product_quantity'] . "\n";
+            if (strpos($newOrderTemplate, '{customer_name}') !== false) {
+                $placeholders['{customer_name}'] = $customer->firstname . ' ' . $customer->lastname;
             }
-            $placeholders['{products_list}'] = $productslist;
-        }
 
-        if (strpos($newOrderTemplate, '{order_comment}') !== false) {
-            $orderMessage = '';
-            if ($order->id) {
-                $orderMessages = Message::getMessagesByOrderId((int) $order->id);
-                if (!empty($orderMessages)) {
-                    $orderMessage = $orderMessages[0]['message'];
+            if (strpos($newOrderTemplate, '{customer_email}') !== false) {
+                $placeholders['{customer_email}'] = $customer->email;
+            }
+
+            if (strpos($newOrderTemplate, '{ip_address}') !== false || strpos($newOrderTemplate, '{country}') !== false) {
+                $ip = Tools::getRemoteAddr();
+
+                if (strpos($newOrderTemplate, '{ip_address}') !== false) {
+                    $placeholders['{ip_address}'] = $ip;
+                }
+
+                if (strpos($newOrderTemplate, '{country}') !== false) {
+                    $placeholders['{country}'] = $this->getCountryFromIP($ip);
                 }
             }
-            $placeholders['{order_comment}'] = $orderMessage;
-        }
 
-        $message = strtr($newOrderTemplate, $placeholders);
-        $this->sendTelegramMessage($message);
+            if (strpos($newOrderTemplate, '{date_time}') !== false) {
+                $placeholders['{date_time}'] = date('Y-m-d H:i:s');
+            }
+
+            if (strpos($newOrderTemplate, '{phone_number}') !== false) {
+                $placeholders['{phone_number}'] = !empty($address->phone_mobile) ?
+                    $address->phone_mobile : $address->phone;
+            }
+
+            if (strpos($newOrderTemplate, '{total_paid}') !== false) {
+                $placeholders['{total_paid}'] = Tools::displayPrice(
+                    $order->getOrdersTotalPaid(),
+                    $order->id_currency,
+                    false
+                );
+            }
+
+            if (strpos($newOrderTemplate, '{shipping_address}') !== false) {
+                $placeholders['{shipping_address}'] = $this->formatShippingAddress($address);
+            }
+
+            if (strpos($newOrderTemplate, '{delivery_method}') !== false) {
+                $carrier = new Carrier($order->id_carrier);
+                $placeholders['{delivery_method}'] = $carrier->name;
+            }
+
+            if (strpos($newOrderTemplate, '{payment_method}') !== false) {
+                $placeholders['{payment_method}'] = $order->payment;
+            }
+
+            if (strpos($newOrderTemplate, '{products_list}') !== false) {
+                $productslist = '';
+                $products = $order->getProducts();
+
+                foreach ($products as $product) {
+                    $attributes = isset($product['attributes']) && !empty($product['attributes'])
+                        ? " (" . $product['attributes'] . ")"
+                        : "";
+                    $productName = $product['product_name'];
+                    $productslist .= "- " . $productName . $attributes .
+                        " x " . (int) $product['product_quantity'] . "\n";
+                }
+                $placeholders['{products_list}'] = $productslist;
+            }
+
+            if (strpos($newOrderTemplate, '{order_comment}') !== false) {
+                $orderMessage = '';
+                if ($order->id) {
+                    $orderMessages = Message::getMessagesByOrderId((int) $order->id);
+                    if (!empty($orderMessages)) {
+                        $orderMessage = $orderMessages[0]['message'];
+                    }
+                }
+                $placeholders['{order_comment}'] = $orderMessage;
+            }
+
+            $message = strtr($newOrderTemplate, $placeholders);
+            $this->sendTelegramMessage($message, 'order');
+        }
     }
 
-    private function sendTelegramMessage($message)
+    private function sendTelegramMessage($message, $notificationType)
     {
         $botToken = $this->getFromCache('TELEGRAMNOTIFY_BOT_TOKEN');
-        $chatIds = $this->getFromCache('TELEGRAMNOTIFY_CHAT_ID');
+
+        switch ($notificationType) {
+            case 'order':
+                $chatIds = $this->getFromCache('TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID');
+                break;
+            case 'admin_login':
+                $chatIds = $this->getFromCache('TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID');
+                break;
+            case 'new_customer':
+                $chatIds = $this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID');
+                break;
+            case 'test':
+                $chatIds = $this->getFromCache('TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID');
+                break;
+            default:
+                $this->logError('Invalid notification type: ' . $notificationType);
+                return false;
+        }
+
         $maxMessages = $this->getFromCache('TELEGRAMNOTIFY_MAX_MESSAGES');
 
         $validate = $this->validateConfigurationData(
             $botToken,
-            $chatIds,
+            $this->getFromCache('TELEGRAMNOTIFY_NEW_ORDER_CHAT_ID'),
+            $this->getFromCache('TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID'),
+            $this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID'),
+            $this->getFromCache('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS'),
             $maxMessages,
             $this->getFromCache('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE'),
             $this->getFromCache('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE'),
-            $this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE'),
-            $this->getFromCache('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS'),
-            $this->getFromCache('TELEGRAMNOTIFY_ADMIN_LOGIN_NOTIFICATIONS'),
-            $this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_NOTIFICATIONS')
+            $this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE')
         );
         if (is_array($validate) && isset($validate[0])) {
             $this->logError('Invalid configuration: ' . json_encode($validate));
@@ -554,7 +572,7 @@ class TelegramNotifier extends Module
         return implode("\n", $parts);
     }
 
-    private function validateConfigurationData($botToken, $chatIds, $maxMessages, $newOrderTemplate, $adminLoginTemplate, $newCustomerTemplate, $updateNotifications, $adminLoginNotifications, $newCustomerNotifications)
+    private function validateConfigurationData($botToken, $newOrdersChatId, $adminLoginChatId, $newCustomerChatId, $updateNotifications, $maxMessages, $newOrderTemplate, $adminLoginTemplate, $newCustomerTemplate)
     {
         $errors = [];
         $default = false;
@@ -563,15 +581,16 @@ class TelegramNotifier extends Module
             $errors[] = $this->l('Bot Token is required.');
         }
 
-        if (empty($chatIds)) {
-            $errors[] = $this->l('Chat ID(s) are required.');
-        } else {
-            $chatIdsArray = array_map('trim', explode(',', $chatIds));
-            foreach ($chatIdsArray as $chatId) {
-                if (!ctype_digit($chatId) || strlen($chatId) < 9 || strlen($chatId) > 10) {
-                    $errors[] = $this->l('Invalid Chat ID: ') . $chatId;
-                }
-            }
+        if (empty($newOrdersChatId) && empty($adminLoginChatId) && empty($newCustomerChatId)) {
+            $errors[] = $this->l('At least one of New Orders, Admin Login, or New Customer Chat ID must be filled.');
+        }
+
+        $this->validateChatIds($newOrdersChatId, 'New Orders Notification Chat ID(s)', $errors);
+        $this->validateChatIds($adminLoginChatId, 'Admin Login Notifications Chat ID(s)', $errors);
+        $this->validateChatIds($newCustomerChatId, 'New Customer Registration Notifications Chat ID(s)', $errors);
+
+        if (!is_bool($updateNotifications)) {
+            $errors[] = $this->l('Update Notifications must be a boolean value.');
         }
 
         if (!is_numeric($maxMessages) || $maxMessages < 0 || !ctype_digit(strval($maxMessages))) {
@@ -582,27 +601,13 @@ class TelegramNotifier extends Module
             $newOrderTemplate = $this->getDefaultNewOrderTemplate();
             $default = true;
         }
-
         if (empty($adminLoginTemplate)) {
             $adminLoginTemplate = $this->getDefaultAdminLoginTemplate();
             $default = true;
         }
-
         if (empty($newCustomerTemplate)) {
             $newCustomerTemplate = $this->getDefaultNewCustomerTemplate();
             $default = true;
-        }
-
-        if (!is_bool($updateNotifications)) {
-            $errors[] = $this->l('Update Notifications must be a boolean value.');
-        }
-
-        if (!is_bool($adminLoginNotifications)) {
-            $errors[] = $this->l('Admin Login Notifications must be a boolean value.');
-        }
-
-        if (!is_bool($newCustomerNotifications)) {
-            $errors[] = $this->l('New Customer Notifications must be a boolean value.');
         }
 
         if (!empty($errors)) {
@@ -615,6 +620,18 @@ class TelegramNotifier extends Module
             'newCustomerTemplate' => $newCustomerTemplate,
             'default' => $default
         ];
+    }
+
+    private function validateChatIds($chatIds, $fieldName, &$errors)
+    {
+        if (!empty($chatIds)) {
+            $chatIdsArray = array_map('trim', explode(',', $chatIds));
+            foreach ($chatIdsArray as $chatId) {
+                if (!preg_match('/^-?\d{9,14}$/', $chatId)) {
+                    $errors[] = $this->l('Invalid ') . $fieldName . ': ' . $chatId;
+                }
+            }
+        }
     }
 
     private function logError($message)
@@ -695,7 +712,7 @@ class TelegramNotifier extends Module
     private function testTelegramMessage()
     {
         $testMessage = 'This is a test message from your PrestaShop Telegram Notifier.';
-        $result = $this->sendTelegramMessage($testMessage);
+        $result = $this->sendTelegramMessage($testMessage, "test");
         if ($result) {
             return $this->displayConfirmation($this->l('Test message sent successfully.'));
         } else {
@@ -751,37 +768,37 @@ class TelegramNotifier extends Module
 
         if (Tools::isSubmit('submit' . $this->name)) {
             $botToken = $getConfigValueFromForm('TELEGRAMNOTIFY_BOT_TOKEN');
-            $chatId = $getConfigValueFromForm('TELEGRAMNOTIFY_CHAT_ID');
+            $newOrdersChatId = $getConfigValueFromForm('TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID');
+            $adminLoginChatId = $getConfigValueFromForm('TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID');
+            $newCustomerChatId = $getConfigValueFromForm('TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID');
+            $updateNotifications = (bool) $getConfigValueFromForm('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS');
             $maxMessages = $getConfigValueFromForm('TELEGRAMNOTIFY_MAX_MESSAGES');
             $newOrderTemplate = $getConfigValueFromForm('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE');
             $adminLoginTemplate = $getConfigValueFromForm('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE');
             $newCustomerTemplate = $getConfigValueFromForm('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE');
-            $updateNotifications = (bool) $getConfigValueFromForm('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS');
-            $newCustomerNotifications = (bool) $getConfigValueFromForm('TELEGRAMNOTIFY_NEW_CUSTOMER_NOTIFICATIONS');
-            $adminLoginNotifications = (bool) $getConfigValueFromForm('TELEGRAMNOTIFY_ADMIN_LOGIN_NOTIFICATIONS');
 
             $validationResult = $this->validateConfigurationData(
                 $botToken,
-                $chatId,
+                $newOrdersChatId,
+                $adminLoginChatId,
+                $newCustomerChatId,
+                $updateNotifications,
                 $maxMessages,
                 $newOrderTemplate,
                 $adminLoginTemplate,
-                $newCustomerTemplate,
-                $updateNotifications,
-                $adminLoginNotifications,
-                $newCustomerNotifications
+                $newCustomerTemplate
             );
 
             if (is_array($validationResult) && array_key_exists('newOrderTemplate', $validationResult)) {
                 $this->setConfigValue('TELEGRAMNOTIFY_BOT_TOKEN', $botToken);
-                $this->setConfigValue('TELEGRAMNOTIFY_CHAT_ID', $chatId);
+                $this->setConfigValue('TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID', $newOrdersChatId);
+                $this->setConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID', $adminLoginChatId);
+                $this->setConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID', $newCustomerChatId);
+                $this->setConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS', $updateNotifications);
                 $this->setConfigValue('TELEGRAMNOTIFY_MAX_MESSAGES', $maxMessages);
                 $this->setConfigValue('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE', $validationResult['newOrderTemplate']);
                 $this->setConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE', $validationResult['adminLoginTemplate']);
                 $this->setConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE', $validationResult['newCustomerTemplate']);
-                $this->setConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS', $updateNotifications);
-                $this->setConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_NOTIFICATIONS', $newCustomerNotifications);
-                $this->setConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_NOTIFICATIONS', $adminLoginNotifications);
 
                 $output .= $this->displayConfirmation($this->l('Settings updated'));
                 if ($validationResult['default']) {
@@ -827,11 +844,46 @@ class TelegramNotifier extends Module
                     ],
                     [
                         'type' => 'text',
-                        'label' => $this->l('Telegram Chat ID(s)'),
-                        'name' => 'TELEGRAMNOTIFY_CHAT_ID',
+                        'label' => $this->l('New Orders Notification Chat ID(s)'),
+                        'name' => 'TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID',
                         'size' => 50,
-                        'required' => true,
-                        'desc' => $this->l('Enter one or more Chat IDs separated by commas.')
+                        'required' => false,
+                        'desc' => $this->l('Enter one or more Chat IDs separated by commas. Use positive numbers for personal chats (e.g., 123456789), negative numbers for group chats (e.g., -987654321), or numbers starting with -100 for channels and some supergroups (e.g., -1001234567890) to receive new order notifications.')
+                    ],
+                    [
+                        'type' => 'text',
+                        'label' => $this->l('Admin Login Notifications Chat ID(s)'),
+                        'name' => 'TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID',
+                        'size' => 50,
+                        'required' => false,
+                        'desc' => $this->l('Enter Chat IDs to receive notifications when someone logs into the admin panel. Use the same format as above.')
+                    ],
+                    [
+                        'type' => 'text',
+                        'label' => $this->l('New Customer Registration Notifications Chat ID(s)'),
+                        'name' => 'TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID',
+                        'size' => 50,
+                        'required' => false,
+                        'desc' => $this->l('Enter Chat IDs to receive notifications for new customer registrations. Use the same format as above.')
+                    ],
+                    [
+                        'type' => 'switch',
+                        'label' => $this->l('Telegram Update Notifications'),
+                        'name' => 'TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS',
+                        'is_bool' => true,
+                        'values' => [
+                            [
+                                'id' => 'active_on',
+                                'value' => 1,
+                                'label' => $this->l('Enabled'),
+                            ],
+                            [
+                                'id' => 'active_off',
+                                'value' => 0,
+                                'label' => $this->l('Disabled'),
+                            ],
+                        ],
+                        'desc' => $this->l('Receive notifications about module updates directly in Telegram. This may slightly slow down your store due to the external API call used for checking updates, but it is recommended to keep it enabled.')
                     ],
                     [
                         'type' => 'text',
@@ -867,63 +919,6 @@ class TelegramNotifier extends Module
                         'rows' => 10,
                         'required' => true,
                         'desc' => $this->l('Available placeholders: {customer_name}, {customer_email}, {ip_address}, {country}, {date_time}, {birthday}, {gender}, {newsletter}.')
-                    ],
-                    [
-                        'type' => 'switch',
-                        'label' => $this->l('Telegram Update Notifications'),
-                        'name' => 'TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS',
-                        'is_bool' => true,
-                        'values' => [
-                            [
-                                'id' => 'active_on',
-                                'value' => 1,
-                                'label' => $this->l('Enabled'),
-                            ],
-                            [
-                                'id' => 'active_off',
-                                'value' => 0,
-                                'label' => $this->l('Disabled'),
-                            ],
-                        ],
-                        'desc' => $this->l('Receive notifications about module updates directly in Telegram. This may slightly slow down your store due to the external API call used for checking updates, but it is recommended to keep it enabled.')
-                    ],
-                    [
-                        'type' => 'switch',
-                        'label' => $this->l('New Customer Registration Notifications'),
-                        'name' => 'TELEGRAMNOTIFY_NEW_CUSTOMER_NOTIFICATIONS',
-                        'is_bool' => true,
-                        'values' => [
-                            [
-                                'id' => 'active_on',
-                                'value' => 1,
-                                'label' => $this->l('Enabled'),
-                            ],
-                            [
-                                'id' => 'active_off',
-                                'value' => 0,
-                                'label' => $this->l('Disabled'),
-                            ],
-                        ],
-                        'desc' => $this->l('Receive notifications when a new customer registers.'),
-                    ],
-                    [
-                        'type' => 'switch',
-                        'label' => $this->l('Admin Login Notifications'),
-                        'name' => 'TELEGRAMNOTIFY_ADMIN_LOGIN_NOTIFICATIONS',
-                        'is_bool' => true,
-                        'values' => [
-                            [
-                                'id' => 'active_on',
-                                'value' => 1,
-                                'label' => $this->l('Enabled'),
-                            ],
-                            [
-                                'id' => 'active_off',
-                                'value' => 0,
-                                'label' => $this->l('Disabled'),
-                            ],
-                        ],
-                        'desc' => $this->l('Receive notifications when someone logs into the admin panel.'),
                     ],
                 ],
                 'submit' => [

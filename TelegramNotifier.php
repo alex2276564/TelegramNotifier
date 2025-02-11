@@ -356,7 +356,7 @@ class TelegramNotifier extends Module
             }
 
             $message = strtr($newOrderTemplate, $placeholders);
-            $this->sendTelegramMessage($message, 'order');
+            $this->sendTelegramMessage($message, 'new_order');
         }
     }
 
@@ -366,7 +366,7 @@ class TelegramNotifier extends Module
         $maxRetries = (int) $this->getFromCache('TELEGRAMNOTIFY_MAX_RETRIES');
 
         switch ($notificationType) {
-            case 'order':
+            case 'new_order':
                 $chatIds = $this->getFromCache('TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID');
                 break;
             case 'admin_login':
@@ -678,16 +678,22 @@ class TelegramNotifier extends Module
     }
 
     private function validateChatIds($chatIds, $fieldName, &$errors)
-    {
-        if (!empty($chatIds)) {
-            $chatIdsArray = array_map('trim', explode(',', $chatIds));
-            foreach ($chatIdsArray as $chatId) {
-                if (!preg_match('/^-?\d{9,14}$/', $chatId)) {
-                    $errors[] = $this->l('Invalid ') . $fieldName . ': ' . $chatId;
-                }
+{
+    if (!empty($chatIds)) {
+        $chatIdsArray = array_map('trim', explode(',', $chatIds));
+        
+        if (count($chatIdsArray) > 30) {
+            $errors[] = $this->l('You can only configure up to 30 ' . $fieldName . 's.');
+            return;
+        }
+
+        foreach ($chatIdsArray as $chatId) {
+            if (!preg_match('/^-?\d{9,15}$/', $chatId)) {
+                $errors[] = $this->l('Invalid ') . $fieldName . ': ' . $chatId;
             }
         }
     }
+}
 
     private function logError($message)
     {

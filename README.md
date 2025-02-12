@@ -42,12 +42,13 @@ TelegramNotifier is a powerful PrestaShop module that sends instant notification
    - Send a message to your newly created bot.  
    - Open the following link in your browser (replace `<YourBOTToken>` with your bot's token):  
 
-   ```url
+   ```text
    https://api.telegram.org/bot<YourBOTToken>/getUpdates
    ```  
 
    - In the JSON response, look for **`"chat": {"id": ...}`** – this is your **Chat ID** (e.g., `123456789`).  
    - Add this chat ID to your configuration (for example, in the "New Orders Notifications" field).  
+   - You can enter multiple chat IDs separated by commas (e.g., `123456789, -987654321, -1001234567890`).  
    - You can enter up to **30** chat IDs per notification type (**Telegram API limit**).  
 
    **Adding Bot to Groups and Channels:**  

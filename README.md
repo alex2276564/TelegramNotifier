@@ -29,89 +29,108 @@ TelegramNotifier is a powerful PrestaShop module that sends instant notification
 4. Upload the downloaded ZIP file of the module.
 5. Once installed, find "TelegramNotifier" in the module list and click "Configure".
 
-## ⚙️ Configuration
+## ⚙️ Configuration  
 
-1. **Telegram Bot Token:**
-   - Create a new bot via [@BotFather](https://t.me/BotFather) on Telegram.
-   - Obtain the Bot Token provided by BotFather.
+1. **Telegram Bot Token:**  
+   - Create a new bot via [@BotFather](https://t.me/BotFather) on Telegram.  
+   - Obtain the Bot Token provided by BotFather.  
 
-2. **Telegram Chat ID(s):**
-   - Send a message to your newly created bot.
-   - Visit `https://api.telegram.org/bot<YourBOTToken>/getUpdates` to get the chat ID.
-   - Add this chat ID to your configuration (If you are setting up for the first time you can try adding to New Orders Notifications).
-   - You can enter multiple chat IDs separated by commas. Please note that the maximum number of chat IDs is limited to 30 to comply with Telegram's rate limits.
+2. **Telegram Chat ID(s):**  
 
-   **Adding Bot to Groups and Channels:**
-   - To add the bot to a group:
-     1. Add the bot to the group.
-     2. Send a message in the group with the bot.
-     3. Visit `https://api.telegram.org/bot<YourBOTToken>/getUpdates` to get the chat ID of the group. **Note: The chat ID for groups will be negative.**
-     4. Add this chat ID to your configuration.
-   - To add the bot to a channel:
-     1. Add the bot to the channel administrators.
-     2. Go to `https://web.telegram.org/a/` and navigate to the channel where you added the bot.
-     3. The chat ID of the channel will be available in the URL of the browser. **Note: The chat ID for channels will be negative.**
-     4. Add this chat ID to your configuration.
+   A **Chat ID** is required to specify where the bot should send notifications.  
 
-   **Note:** At least one of the three notification types (New Orders, Admin Login, or New Customer) must have at least one chat ID specified.
+   - Send a message to your newly created bot.  
+   - Open the following link in your browser (replace `<YourBOTToken>` with your bot's token):  
 
-   **Example usage:**
-   - If you have a courier, you can add their chat ID to the New Orders Notifications (to avoid sending them unnecessary notifications).
-   - You can add a sysadmin's chat ID to all types of notifications.
+   ```url
+   https://api.telegram.org/bot<YourBOTToken>/getUpdates
+   ```  
 
-3. **Telegram Update Notifications:**
-   - Stay informed about new updates to the TelegramNotifier module directly through Telegram messages.
+   - In the JSON response, look for **`"chat": {"id": ...}`** – this is your **Chat ID** (e.g., `123456789`).  
+   - Add this chat ID to your configuration (for example, in the "New Orders Notifications" field).  
+   - You can enter up to **30** chat IDs per notification type (**Telegram API limit**).  
 
-4. **Max Messages per Action:**
-   - This setting allows you to control the maximum number of messages sent per action.
-   - In most cases, you don't need to change this value.
-   - If your store frequently receives many simultaneous orders, it's recommended to reduce this value to 2. This will ensure more efficient message delivery, but the messages may be less detailed.
-   - All messages will be sent 100% but not fully detailed if you decrease this value.
-   - Set this value to 0 for unlimited messages per action.
+   **Adding Bot to Groups and Channels:**  
+   - **To add the bot to a group:**  
+     1. Add the bot to the group.  
+     2. Send a message in the group with the bot.  
+     3. Visit `https://api.telegram.org/bot<YourBOTToken>/getUpdates` to get the chat ID of the group.  
+        **Note:** The chat ID for groups will be **negative** (e.g., `-987654321`).  
+     4. Add this chat ID to your configuration.  
+   - **To add the bot to a channel:**  
+     1. Add the bot as an administrator of the channel.  
+     2. Open **[Web Telegram](https://web.telegram.org/a/)** and navigate to the channel.  
+     3. Look at the **URL** in your browser; it will be something like:  
 
-5. **Max Retry Attempts:**
-   - Number of retry attempts if sending fails.
-   - Set to 0 for dedicated hosting with stable network (recommended).
-   - Increase this value (1-3) for shared hosting or unstable network.
-   - Note: Telegram API can sometimes return incorrect responses, so it's better to keep this at 0 on stable connections.
+        ```text
+        https://web.telegram.org/a/#-1001234567890
+        ```  
 
-6. **Message Templates:**
-   Customize the notification messages using available placeholders:
+        **Channel Chat IDs always start with** `-100` (e.g., `-1001234567890`).  
+     4. Add this chat ID to your configuration.  
 
-   **New Order Notification Template:**
-   - `{order_reference}`: The unique order reference 📦
-   - `{shop_name}`: The name of the shop 🛍️
-   - `{customer_name}`: Name of the customer 👤
-   - `{customer_email}`: Email address of the customer 📧
-   - `{ip_address}`: The IP address of the customer 🌐
-   - `{country}`: The country of the customer 🏳️
-   - `{date_time}`: The date and time of the order (server time) 🕒
-   - `{phone_number}`: Customer's phone number 📞
-   - `{total_paid}`: Total amount paid for the order 💰
-   - `{shipping_address}`: Delivery address 🏠
-   - `{delivery_method}`: Chosen delivery method 🚚
-   - `{payment_method}`: Method of payment used 💳
-   - `{products_list}`: List of products in the order 🛍️
-   - `{order_comment}`: Any comment left by the customer 📝
+   **Note:** At least one of the three notification types (**New Orders, Admin Login, or New Customer**) must have at least one chat ID specified. This is required for the module to work - the validator won't allow saving settings without at least one chat ID in any of these notification types.
 
-   **Admin Login Notification Template:**
-   - `{employee_name}`: Name of the employee who logged in 👤
-   - `{employee_email}`: Email address of the employee 📧
-   - `{ip_address}`: IP address used for login 🌐
-   - `{country}`: Country associated with the IP address 🏳️
-   - `{date_time}`: Date and time of the login (server time) 🕒
+   **Example usage:**  
+   - If you have a courier, you can add their chat ID to the **New Orders Notifications** (to avoid sending them unnecessary notifications).  
+   - You can add a sysadmin's chat ID to all types of notifications.  
 
-   **New Customer Notification Template:**
-   - `{customer_name}`: Name of the customer 👤
-   - `{customer_email}`: Email address of the customer 📧
-   - `{ip_address}`: The IP address of the customer 🌐
-   - `{country}`: The country of the customer 🏳️
-   - `{date_time}`: The date and time of the registration (server time) 🕒
-   - `{birthday}`: Customer's birthday 🎂
-   - `{gender}`: Customer's gender 👫
-   - `{newsletter}`: Whether the customer subscribed to the newsletter 📰
+3. **Telegram Update Notifications:**  
+   - Stay informed about new updates to the TelegramNotifier module directly through Telegram messages.  
 
-7. Save your settings and use the "Test Message" button to verify the configuration. Note that the test message will only be sent to the chat ID(s) specified in the New Orders Notifications field.
+4. **Max Messages per Action:**  
+   - This setting allows you to control the maximum number of messages sent per action.  
+   - In most cases, you don't need to change this value.  
+   - If your store generates many simultaneous Telegram notifications, it's recommended to reduce this value to **2**. This will ensure more efficient message delivery through Telegram API, but the messages may be less detailed.  
+   - All messages will be sent 100%, but with reduced details if you lower this value.  
+   - Set this value to **0** for unlimited messages per action.  
+
+5. **Max Retry Attempts:**  
+   - Number of retry attempts if sending fails.  
+   - Set to **0** to disable retries (**recommended** for dedicated hosting with a stable network).  
+   - Increase this value (**1-3**) for shared hosting or an unstable network.  
+   - **Note:** The Telegram API can sometimes return incorrect responses, so it's better to keep this at **0** on stable connections.  
+
+6. **Message Templates:**  
+   Customize the notification messages using available placeholders:  
+
+   **New Order Notification Template:**  
+   - `{order_reference}`: The unique order reference 📦  
+   - `{shop_name}`: The name of the shop 🛍️  
+   - `{customer_name}`: Name of the customer 👤  
+   - `{customer_email}`: Email address of the customer 📧  
+   - `{ip_address}`: The IP address of the customer 🌐  
+   - `{country}`: The country of the customer 🏳️  
+   - `{date_time}`: The date and time of the order (server time) 🕒  
+   - `{phone_number}`: Customer's phone number 📞  
+   - `{total_paid}`: Total amount paid for the order 💰  
+   - `{shipping_address}`: Delivery address 🏠  
+   - `{delivery_method}`: Chosen delivery method 🚚  
+   - `{payment_method}`: Method of payment used 💳  
+   - `{products_list}`: List of products in the order 🛍️  
+   - `{order_comment}`: Any comment left by the customer 📝  
+
+   **Admin Login Notification Template:**  
+   - `{employee_name}`: Name of the employee who logged in 👤  
+   - `{employee_email}`: Email address of the employee 📧  
+   - `{ip_address}`: IP address used for login 🌐  
+   - `{country}`: Country associated with the IP address 🏳️  
+   - `{date_time}`: Date and time of the login (server time) 🕒  
+
+   **New Customer Notification Template:**  
+   - `{customer_name}`: Name of the customer 👤  
+   - `{customer_email}`: Email address of the customer 📧  
+   - `{ip_address}`: The IP address of the customer 🌐  
+   - `{country}`: The country of the customer 🏳️  
+   - `{date_time}`: The date and time of the registration (server time) 🕒  
+   - `{birthday}`: Customer's birthday 🎂  
+   - `{gender}`: Customer's gender 👫  
+   - `{newsletter}`: Whether the customer subscribed to the newsletter 📰  
+
+7. **Final Step:**  
+   Save your settings and use the **"Test Message"** button to verify the configuration.  
+
+   **Note:** The test message will only be sent to the chat ID(s) specified in the **New Orders Notifications** field.  
 
 ## ⚠️ Notes
 

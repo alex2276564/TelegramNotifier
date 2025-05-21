@@ -327,7 +327,7 @@ class TelegramNotifier extends Module
                 $products = $order->getProducts();
                 $currency = new Currency($order->id_currency);
                 $link = Context::getContext()->link;
-                
+
                 foreach ($products as $product) {
                     $attributes = isset($product['attributes']) && !empty($product['attributes'])
                         ? " (" . $product['attributes'] . ")"
@@ -339,8 +339,8 @@ class TelegramNotifier extends Module
                     $formattedPrice = Tools::displayPrice($productPrice, $currency);
 
                     $productLink = $link->getProductLink($product['id_product']);
-                    
-                    $productslist .= "- <a href=\"$productLink\">$productName</a>$attributes -" . (int) $product['product_quantity'] ."x ($formattedPrice)\n\n";
+
+                    $productslist .= "- <a href=\"$productLink\">$productName</a>$attributes -" . (int) $product['product_quantity'] . "x ($formattedPrice)\n";
                 }
                 $placeholders['{products_list}'] = $productslist;
             }
@@ -430,7 +430,7 @@ class TelegramNotifier extends Module
                 $postData[] = [
                     'chat_id' => $chatId,
                     'text' => $part,
-                    'parse_mode' => 'HTML'
+                    'parse_mode' => 'HTML',
                     'disable_web_page_preview' => true,
                 ];
             }
@@ -680,22 +680,22 @@ class TelegramNotifier extends Module
     }
 
     private function validateChatIds($chatIds, $fieldName, &$errors)
-{
-    if (!empty($chatIds)) {
-        $chatIdsArray = array_map('trim', explode(',', $chatIds));
-        
-        if (count($chatIdsArray) > 30) {
-            $errors[] = $this->l('You can only configure up to 30 ' . $fieldName . 's.');
-            return;
-        }
+    {
+        if (!empty($chatIds)) {
+            $chatIdsArray = array_map('trim', explode(',', $chatIds));
 
-        foreach ($chatIdsArray as $chatId) {
-            if (!preg_match('/^-?\d{9,15}$/', $chatId)) {
-                $errors[] = $this->l('Invalid ') . $fieldName . ': ' . $chatId;
+            if (count($chatIdsArray) > 30) {
+                $errors[] = $this->l('You can only configure up to 30 ' . $fieldName . 's.');
+                return;
+            }
+
+            foreach ($chatIdsArray as $chatId) {
+                if (!preg_match('/^-?\d{9,15}$/', $chatId)) {
+                    $errors[] = $this->l('Invalid ') . $fieldName . ': ' . $chatId;
+                }
             }
         }
     }
-}
 
     private function logError($message)
     {

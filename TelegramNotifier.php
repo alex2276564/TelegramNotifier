@@ -11,7 +11,7 @@ class TelegramNotifier extends Module
         'TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS' => 'bool',
         'TELEGRAMNOTIFY_MAX_MESSAGES' => 'int',
         'TELEGRAMNOTIFY_MAX_RETRIES' => 'int',
-
+        'TELEGRAMNOTIFY_LAST_UPDATE_CHECK' => 'int',
     ];
 
     private function getFromCache($key)
@@ -96,9 +96,12 @@ class TelegramNotifier extends Module
             'TELEGRAMNOTIFY_MAX_RETRIES' => (int) $this->getFromCache('TELEGRAMNOTIFY_MAX_RETRIES'),
             'TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE' => $this->getFromCache('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE'),
             'TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE' => $this->getFromCache('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE'),
-            'TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE' => $this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE')
+            'TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE' => $this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE'),
+            'TELEGRAMNOTIFY_LAST_UPDATE_CHECK' => (int) $this->getFromCache('TELEGRAMNOTIFY_LAST_UPDATE_CHECK'),
+            'TELEGRAMNOTIFY_CACHED_VERSION' => $this->getFromCache('TELEGRAMNOTIFY_CACHED_VERSION')
         ];
     }
+
 
     public function install()
     {
@@ -115,7 +118,9 @@ class TelegramNotifier extends Module
             $this->setConfigValue('TELEGRAMNOTIFY_MAX_RETRIES', 0) &&
             $this->setConfigValue('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE', $this->getDefaultNewOrderTemplate()) &&
             $this->setConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE', $this->getDefaultAdminLoginTemplate()) &&
-            $this->setConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE', $this->getDefaultNewCustomerTemplate());
+            $this->setConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE', $this->getDefaultNewCustomerTemplate()) &&
+            $this->setConfigValue('TELEGRAMNOTIFY_LAST_UPDATE_CHECK', 0) &&
+            $this->setConfigValue('TELEGRAMNOTIFY_CACHED_VERSION', false);
     }
 
     public function uninstall()
@@ -130,7 +135,9 @@ class TelegramNotifier extends Module
             $this->deleteConfigValue('TELEGRAMNOTIFY_MAX_RETRIES') &&
             $this->deleteConfigValue('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE') &&
             $this->deleteConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE') &&
-            $this->deleteConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE');
+            $this->deleteConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE') &&
+            $this->deleteConfigValue('TELEGRAMNOTIFY_LAST_UPDATE_CHECK') &&
+            $this->deleteConfigValue('TELEGRAMNOTIFY_CACHED_VERSION');
     }
 
     public function hookActionCustomerAccountAdd($params)
@@ -786,10 +793,20 @@ class TelegramNotifier extends Module
 
     private function checkForUpdates()
     {
+        $lastCheckTime = $this->getFromCache('TELEGRAMNOTIFY_LAST_UPDATE_CHECK');
+        $currentTime = time();
+
+        if ($lastCheckTime && ($currentTime - $lastCheckTime < 3600)) {
+            $cachedVersion = $this->getFromCache('TELEGRAMNOTIFY_CACHED_VERSION');
+            return !empty($cachedVersion) ? $cachedVersion : false;
+        }
+
         $url = "https://api.github.com/repos/alex2276564/TelegramNotifier/releases/latest";
         $headers = ["User-Agent: php"];
 
         $response = $this->executeCurlRequest($url, null, $headers);
+
+        $this->setConfigValue('TELEGRAMNOTIFY_LAST_UPDATE_CHECK', $currentTime);
 
         if ($response['error']) {
             $this->logError('Failed to check for updates: ' . $response['error']);
@@ -804,10 +821,12 @@ class TelegramNotifier extends Module
         $release = json_decode($response['result'], true);
 
         if (isset($release['tag_name']) && version_compare($release['tag_name'], $this->version, '>')) {
+            $this->setConfigValue('TELEGRAMNOTIFY_CACHED_VERSION', $release['tag_name']);
             return $release['tag_name'];
+        } else {
+            $this->setConfigValue('TELEGRAMNOTIFY_CACHED_VERSION', '');
+            return false;
         }
-
-        return false;
     }
 
     public function getContent()
@@ -950,7 +969,7 @@ class TelegramNotifier extends Module
                                 'label' => $this->l('Disabled'),
                             ],
                         ],
-                        'desc' => $this->l('Receive notifications about module updates directly in Telegram. This may slightly slow down your store due to the external API call used for checking updates, but it is recommended to keep it enabled.')
+                        'desc' => $this->l('Receive notifications about module updates directly in Telegram.')
                     ],
                     [
                         'type' => 'text',

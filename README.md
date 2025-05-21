@@ -136,7 +136,6 @@ TelegramNotifier is a powerful PrestaShop module that sends instant notification
 ## ⚠️ Notes
 
 - Using the `{country}` placeholder in the message templates might slightly slow down your store due to the external API call required to retrieve the country information.
-- The Telegram Update Notifications feature might slightly slow down your store due to the external API call used to check for updates, but it is recommended to keep it enabled.
 
 ## 🔐 Security Note
 

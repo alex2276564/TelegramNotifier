@@ -91,6 +91,11 @@ TelegramNotifier is a powerful PrestaShop module that sends instant notification
    - Set to **0** to disable retries (**recommended** for dedicated hosting with a stable network).  
    - Increase this value (**1-3**) for shared hosting or an unstable network.  
    - **Note:** The Telegram API can sometimes return incorrect responses, so it's better to keep this at **0** on stable connections.  
+   - **Tip:** Enable this option (**3-10**) if you have:
+     - Multiple PrestaShop installations with TelegramNotifier on the same server (sharing the same IP address)
+     - Multiple shops using the same Telegram bot token
+
+     This can help manage Telegram's rate limits when multiple notifications are sent simultaneously.
 
 6. **Message Templates:**  
    Customize the notification messages using available placeholders:  

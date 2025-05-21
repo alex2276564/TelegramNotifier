@@ -333,15 +333,16 @@ class TelegramNotifier extends Module
                         ? " (" . $product['attributes'] . ")"
                         : "";
                     $productName = $product['product_name'];
-
                     $productPrice = $product['unit_price_tax_incl'];
-
                     $formattedPrice = Tools::displayPrice($productPrice, $currency);
-
                     $productLink = $link->getProductLink($product['id_product']);
+                    $quantity = (int) $product['product_quantity'];
 
-                    $productslist .= "- <a href=\"$productLink\">$productName</a>$attributes -" . (int) $product['product_quantity'] . "x ($formattedPrice)\n";
+                    $productslist .= "- <a href=\"$productLink\">$productName</a>$attributes" .
+                        " x " . $quantity .
+                        " (" . $formattedPrice . ")\n";
                 }
+
                 $placeholders['{products_list}'] = $productslist;
             }
 

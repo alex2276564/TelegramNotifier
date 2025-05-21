@@ -326,7 +326,8 @@ class TelegramNotifier extends Module
                 $productslist = '';
                 $products = $order->getProducts();
                 $currency = new Currency($order->id_currency);
-
+                $link = Context::getContext()->link;
+                
                 foreach ($products as $product) {
                     $attributes = isset($product['attributes']) && !empty($product['attributes'])
                         ? " (" . $product['attributes'] . ")"
@@ -337,9 +338,9 @@ class TelegramNotifier extends Module
 
                     $formattedPrice = Tools::displayPrice($productPrice, $currency);
 
-                    $productslist .= "- " . $productName . $attributes .
-                        " x " . (int) $product['product_quantity'] .
-                        " (" . $formattedPrice . ")\n";
+                    $productLink = $link->getProductLink($product['id_product']);
+                    
+                    $productslist .= "- <a href=\"$productLink\">$productName</a>$attributes -" . (int) $product['product_quantity'] ."x ($formattedPrice)\n\n";
                 }
                 $placeholders['{products_list}'] = $productslist;
             }
@@ -429,6 +430,7 @@ class TelegramNotifier extends Module
                 $postData[] = [
                     'chat_id' => $chatId,
                     'text' => $part,
+                    'parse_mode' => 'HTML'
                     'disable_web_page_preview' => true,
                 ];
             }

@@ -587,8 +587,11 @@ class TelegramNotifier extends Module
 
         $running = null;
         do {
-            curl_multi_exec($mh, $running);
-        } while ($running > 0);
+            $status = curl_multi_exec($mh, $running);
+            if ($running) {
+                curl_multi_select($mh, 0.05);
+            }
+        } while ($running > 0 && $status == CURLM_OK);
 
         $results = [];
         foreach ($curlHandles as $ch) {

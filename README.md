@@ -63,6 +63,7 @@ After installing TelegramNotifier, you'll enter the module configuration and enc
      1. Add the bot to the group.
      2. Send any message in the group with the bot (like "Hello").
      3. Visit `https://api.telegram.org/bot<YourBOTToken>/getUpdates` to get the chat ID of the group.
+
         **Note:** The chat ID for groups will be **negative** (e.g., `-987654321`).
      4. Add this chat ID to your configuration.
    - **Channel Method:**

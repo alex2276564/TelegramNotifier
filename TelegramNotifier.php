@@ -961,7 +961,7 @@ class TelegramNotifier extends Module
                     ],
                     [
                         'type' => 'text',
-                        'label' => $this->l('Telegram Bot Token'),
+                        'label' => $this->l('🔑 Telegram Bot Token'),
                         'name' => 'TELEGRAMNOTIFY_BOT_TOKEN',
                         'size' => 50,
                         'required' => true,
@@ -969,7 +969,7 @@ class TelegramNotifier extends Module
                     ],
                     [
                         'type' => 'text',
-                        'label' => $this->l('New Orders Notification Chat ID(s)'),
+                        'label' => $this->l('📦 New Orders Notification Chat ID(s)'),
                         'name' => 'TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID',
                         'size' => 50,
                         'required' => false,
@@ -977,7 +977,7 @@ class TelegramNotifier extends Module
                     ],
                     [
                         'type' => 'text',
-                        'label' => $this->l('Admin Login Notifications Chat ID(s)'),
+                        'label' => $this->l('🔐 Admin Login Notifications Chat ID(s)'),
                         'name' => 'TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID',
                         'size' => 50,
                         'required' => false,
@@ -985,7 +985,7 @@ class TelegramNotifier extends Module
                     ],
                     [
                         'type' => 'text',
-                        'label' => $this->l('New Customer Registration Notifications Chat ID(s)'),
+                        'label' => $this->l('🆕 New Customer Registration Notifications Chat ID(s)'),
                         'name' => 'TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID',
                         'size' => 50,
                         'required' => false,
@@ -993,7 +993,7 @@ class TelegramNotifier extends Module
                     ],
                     [
                         'type' => 'switch',
-                        'label' => $this->l('Telegram Update Notifications'),
+                        'label' => $this->l('🔔 Telegram Update Notifications'),
                         'name' => 'TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS',
                         'is_bool' => true,
                         'values' => [
@@ -1012,7 +1012,7 @@ class TelegramNotifier extends Module
                     ],
                     [
                         'type' => 'text',
-                        'label' => $this->l('Max Messages per Action'),
+                        'label' => $this->l('📊 Max Messages per Action'),
                         'name' => 'TELEGRAMNOTIFY_MAX_MESSAGES',
                         'size' => 5,
                         'required' => true,
@@ -1020,7 +1020,7 @@ class TelegramNotifier extends Module
                     ],
                     [
                         'type' => 'text',
-                        'label' => $this->l('Max Retry Attempts'),
+                        'label' => $this->l('🔄 Max Retry Attempts'),
                         'name' => 'TELEGRAMNOTIFY_MAX_RETRIES',
                         'size' => 5,
                         'required' => true,
@@ -1028,7 +1028,7 @@ class TelegramNotifier extends Module
                     ],
                     [
                         'type' => 'textarea',
-                        'label' => $this->l('New Order Notification Template'),
+                        'label' => $this->l('📝 New Order Notification Template'),
                         'name' => 'TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE',
                         'cols' => 60,
                         'rows' => 10,
@@ -1037,7 +1037,7 @@ class TelegramNotifier extends Module
                     ],
                     [
                         'type' => 'textarea',
-                        'label' => $this->l('Admin Login Notification Template'),
+                        'label' => $this->l('🔒 Admin Login Notification Template'),
                         'name' => 'TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE',
                         'cols' => 60,
                         'rows' => 10,
@@ -1046,7 +1046,7 @@ class TelegramNotifier extends Module
                     ],
                     [
                         'type' => 'textarea',
-                        'label' => $this->l('New Customer Notification Template'),
+                        'label' => $this->l('👤 New Customer Notification Template'),
                         'name' => 'TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE',
                         'cols' => 60,
                         'rows' => 10,

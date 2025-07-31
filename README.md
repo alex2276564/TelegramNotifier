@@ -1,7 +1,7 @@
 # TelegramNotifier for PrestaShop 🛍️📱
 
-[![PrestaShop](https://img.shields.io/badge/PrestaShop-1.7%20%7C%208.x-blue.svg)](https://prestashop.com/)
-[![PHP](https://img.shields.io/badge/PHP-7.2%20%7C%207.3%20%7C%207.4%20%7C%208.0%20%7C%208.1-8892BF.svg?style=flat-square)](https://www.php.net/)
+[![PrestaShop](https://img.shields.io/badge/PrestaShop-1.7%20%7C%208.x%20%7C%209.x-blue.svg)](https://prestashop.com/)
+[![PHP](https://img.shields.io/badge/PHP-7.2%20%7C%207.3%20%7C%207.4%20%7C%208.0%20%7C%208.1%20%7C%208.2%20%7C%208.3%20%7C%208.4-8892BF.svg?style=flat-square)](https://www.php.net/)
 [![Version](https://img.shields.io/github/v/release/alex2276564/TelegramNotifier?color=blue)](https://github.com/alex2276564/TelegramNotifier/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -152,6 +152,8 @@ After installing TelegramNotifier, you'll enter the module configuration and enc
 ## ⚠️ Notes
 
 - Using the `{country}` placeholder in the message templates might slightly slow down your store due to the external API call required to retrieve the country information.
+
+- Admin login notifications are currently not supported in PrestaShop 9.x due to changes in the authentication system. This feature works only in PrestaShop 1.7 and 8.x versions. Support is planned for future updates.
 
 ## 🔐 Security Note
 

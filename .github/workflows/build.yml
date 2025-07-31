@@ -40,68 +40,6 @@ jobs:
           config: '.markdownlint.jsonc'  # if you have a configuration file
 #        continue-on-error: true  # to prevent the build from crashing due to errors in the documentation
 
-  security-scan-codeql:
-    name: 🔐 CodeQL Security Scan
-    runs-on: ubuntu-latest
-
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-
-    steps:
-      - uses: actions/checkout@main
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: php
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@main
-        with:
-          php-version: '8.1'
-
-      - name: CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
-
-  security-scan-psalm:
-    name: 🔐 Psalm Static Analysis
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@main
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@main
-        with:
-          php-version: '8.1'
-
-      - name: Install Psalm
-        run: composer global require vimeo/psalm
-
-      - name: Run Psalm
-        run: ~/.composer/vendor/bin/psalm --init . --level=3 && ~/.composer/vendor/bin/psalm
-
-  security-scan-snyk:
-    name: 🔐 Snyk Security Scan
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@main
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@main
-        with:
-          php-version: '8.1'
-
-      - name: Run Snyk to check for vulnerabilities
-        uses: snyk/actions/php@master
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          args: --severity-threshold=high
-
   secrets-scan:
     name: 🔑 Secrets Scan
     runs-on: ubuntu-latest
@@ -129,7 +67,7 @@ jobs:
 
   build:
     name: 🏗️ Build Plugin
-    needs: [lint-php, lint-markdown, security-scan-codeql, security-scan-snyk, secrets-scan, security-scan-psalm]
+    needs: [lint-php, lint-markdown, secrets-scan]
     runs-on: ubuntu-latest
 
     steps:

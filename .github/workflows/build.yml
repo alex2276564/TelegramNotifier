@@ -2,15 +2,20 @@ name: Build TelegramNotifier
 
 on:
   push:
+    branches: [main]
+
   pull_request:
+    branches: [main]
 
 
 jobs:
 
-  php-lint:
+  lint-php:
+    name: 🧹 Lint PHP
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@main
       
       - name: PHP Syntax Check
         run: |
@@ -20,23 +25,115 @@ jobs:
             exit 1
           fi
 
-  markdown-lint:
+  lint-markdown:
+    name: 🧹 Lint Markdown
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@main
 
       - name: Lint Markdown files
-        uses: DavidAnson/markdownlint-cli2-action@v20
+        uses: DavidAnson/markdownlint-cli2-action@main
         with:
           globs: '**/*.md' # Checks all Markdown files in the repository
           fix: true # automatically fixes simple problems
           config: '.markdownlint.jsonc'  # if you have a configuration file
 #        continue-on-error: true  # to prevent the build from crashing due to errors in the documentation
 
-  build:
+  security-scan-codeql:
+    name: 🔐 CodeQL Security Scan
     runs-on: ubuntu-latest
+
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@main
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: php
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@main
+        with:
+          php-version: '8.1'
+
+      - name: CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+  security-scan-psalm:
+    name: 🔐 Psalm Static Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@main
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@main
+        with:
+          php-version: '8.1'
+
+      - name: Install Psalm
+        run: composer global require vimeo/psalm
+
+      - name: Run Psalm
+        run: ~/.composer/vendor/bin/psalm --init . --level=3 && ~/.composer/vendor/bin/psalm
+
+  security-scan-snyk:
+    name: 🔐 Snyk Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@main
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@main
+        with:
+          php-version: '8.1'
+
+      - name: Run Snyk to check for vulnerabilities
+        uses: snyk/actions/php@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
+
+  secrets-scan:
+    name: 🔑 Secrets Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@main
+        with:
+          fetch-depth: 0  # Required for diff scan
+
+      - name: TruffleHog Secrets Scan (full)
+        if: github.event_name != 'pull_request'
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          extra_args: --results=verified,unknown
+
+      - name: TruffleHog Secrets Scan (diff)
+        if: github.event_name == 'pull_request'
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.pull_request.base.sha }}
+          head: ${{ github.event.pull_request.head.sha }}
+          extra_args: --results=verified,unknown
+
+  build:
+    name: 🏗️ Build Plugin
+    needs: [lint-php, lint-markdown, security-scan-codeql, security-scan-snyk, secrets-scan, security-scan-psalm]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@main
 
       - name: Create directory
         run: mkdir telegramnotifier
@@ -48,7 +145,7 @@ jobs:
         run: zip -r telegramnotifier.zip telegramnotifier
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@main
         with:
           name: TelegramNotifier
           path: telegramnotifier.zip

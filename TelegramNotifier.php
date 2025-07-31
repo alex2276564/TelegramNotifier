@@ -821,6 +821,10 @@ class TelegramNotifier extends Module
 
     private function testTelegramMessage()
     {
+        if (empty($this->getFromCache('TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID'))) {
+            return $this->displayError($this->l('Test message only sent to New Orders Chat ID. Please configure it first.'));
+        }
+
         $testMessage = 'This is a test message from your PrestaShop Telegram Notifier.';
         $result = $this->sendTelegramMessage($testMessage, "test");
         if ($result) {

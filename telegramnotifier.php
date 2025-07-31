@@ -49,7 +49,7 @@ class TelegramNotifier extends Module
     {
         $this->name = 'telegramnotifier';
         $this->tab = 'administration';
-        $this->version = '1.0.7';
+        $this->version = '1.0.8';
         $this->author = 'alex2276564';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array('min' => '1.7.0.0', 'max' => _PS_VERSION_);

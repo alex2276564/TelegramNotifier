@@ -39,16 +39,16 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Create directory
-        run: mkdir TelegramNotifier
+        run: mkdir telegramnotifier
 
       - name: Move files
-        run: mv LICENSE README.md TelegramNotifier.php config.xml index.php logo.png TelegramNotifier
+        run: mv LICENSE README.md telegramnotifier.php config.xml index.php logo.png telegramnotifier
 
       - name: Create ZIP archive
-        run: zip -r TelegramNotifier.zip TelegramNotifier
+        run: zip -r telegramnotifier.zip telegramnotifier
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: TelegramNotifier
-          path: TelegramNotifier.zip
+          path: telegramnotifier.zip

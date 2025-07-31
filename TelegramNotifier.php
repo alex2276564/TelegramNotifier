@@ -47,7 +47,7 @@ class TelegramNotifier extends Module
 
     public function __construct()
     {
-        $this->name = 'TelegramNotifier';
+        $this->name = 'telegramnotifier';
         $this->tab = 'administration';
         $this->version = '1.0.7';
         $this->author = 'alex2276564';

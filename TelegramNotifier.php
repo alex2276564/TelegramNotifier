@@ -409,7 +409,7 @@ class TelegramNotifier extends Module
 
         $validate = $this->validateConfigurationData(
             $botToken,
-            $this->getFromCache('TELEGRAMNOTIFY_NEW_ORDER_CHAT_ID'),
+            $this->getFromCache('TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID'),
             $this->getFromCache('TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID'),
             $this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID'),
             $this->getFromCache('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS'),

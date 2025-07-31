@@ -58,7 +58,7 @@ class TelegramNotifier extends Module
         parent::__construct();
 
         $this->displayName = $this->l('Telegram Notifier');
-        $this->description = $this->l('Sends Telegram notifications for new orders, admin logins, and new customer registrations.');
+        $this->description = $this->l('Sends Telegram notifications for new orders, admin logins (PS 1.7-8), and new customer registrations.');
 
         $this->confirmUninstall = $this->l('Are you sure you want to uninstall?');
 
@@ -102,13 +102,29 @@ class TelegramNotifier extends Module
         ];
     }
 
+    private function isPrestaShop9()
+    {
+        return version_compare(_PS_VERSION_, '9.0.0', '>=');
+    }
 
     public function install()
     {
-        return parent::install() &&
-            $this->registerHook('actionValidateOrder') &&
-            $this->registerHook('actionAdminLoginControllerLoginAfter') &&
-            $this->registerHook('actionCustomerAccountAdd') &&
+        $hooks = [
+            'actionValidateOrder',
+            'actionCustomerAccountAdd'
+        ];
+
+        if (!$this->isPrestaShop9()) {
+            $hooks[] = 'actionAdminLoginControllerLoginAfter';
+        }
+
+        $installResult = parent::install();
+
+        foreach ($hooks as $hook) {
+            $installResult = $installResult && $this->registerHook($hook);
+        }
+
+        return $installResult &&
             $this->setConfigValue('TELEGRAMNOTIFY_BOT_TOKEN', '') &&
             $this->setConfigValue('TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID', '') &&
             $this->setConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID', '') &&
@@ -309,11 +325,8 @@ class TelegramNotifier extends Module
             }
 
             if (strpos($newOrderTemplate, '{total_paid}') !== false) {
-                $placeholders['{total_paid}'] = Tools::displayPrice(
-                    $order->getOrdersTotalPaid(),
-                    $order->id_currency,
-                    false
-                );
+                $totalPaid = $this->getOrderTotalPaid($order);
+                $placeholders['{total_paid}'] = $this->formatPrice($totalPaid, $order->id_currency);
             }
 
             if (strpos($newOrderTemplate, '{shipping_address}') !== false) {
@@ -341,7 +354,7 @@ class TelegramNotifier extends Module
                         : "";
                     $productName = $product['product_name'];
                     $productPrice = $product['unit_price_tax_incl'];
-                    $formattedPrice = Tools::displayPrice($productPrice, $currency);
+                    $formattedPrice = $this->formatPrice($productPrice, $currency->id);
                     $productLink = $link->getProductLink($product['id_product']);
                     $quantity = (int) $product['product_quantity'];
 
@@ -781,6 +794,29 @@ class TelegramNotifier extends Module
 
         $gender = new Gender($id_gender, $this->context->language->id);
         return $gender->name;
+    }
+
+    private function getOrderTotalPaid($order)
+    {
+        if ($this->isPrestaShop9()) {
+            return $order->total_paid_tax_incl;
+        } else {
+            if (method_exists($order, 'getOrdersTotalPaid')) {
+                return $order->getOrdersTotalPaid();
+            } else {
+                return $order->total_paid_tax_incl;
+            }
+        }
+    }
+
+    private function formatPrice($price, $currencyId)
+    {
+        if ($this->isPrestaShop9()) {
+            $currency = new Currency($currencyId);
+            return $currency->sign . number_format($price, 2, '.', ' ');
+        } else {
+            return Tools::displayPrice($price, $currencyId, false);
+        }
     }
 
     private function testTelegramMessage()

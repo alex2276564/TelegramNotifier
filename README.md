@@ -172,7 +172,7 @@ If you've configured chat IDs for admin login notifications and are now unable t
 1. **📡 Connect to Server**: Connect to your server via FTP/SFTP.
 2. **📁 Locate Root Directory**: Navigate to the root directory of your PrestaShop installation.
 3. **📂 Find Modules Folder**: Go to the `/modules` folder.
-4. **🗑️ Remove Module**: Locate and delete the `TelegramNotifier` folder.
+4. **🗑️ Remove Module**: Locate and delete the `telegramnotifier` folder.
 
 This will disable the module and should restore your ability to access the admin panel. After regaining access, you can reinstall the module and reconfigure it with the correct settings.
 

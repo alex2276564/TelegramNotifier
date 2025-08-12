@@ -7,16 +7,14 @@ on:
   pull_request:
     branches: [main]
 
-
 jobs:
-
   lint-php:
     name: 🧹 Lint PHP
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@main
-      
+
       - name: PHP Syntax Check
         run: |
           find . -name "*.php" -print0 | xargs -0 -n1 php -l
@@ -35,10 +33,10 @@ jobs:
       - name: Lint Markdown files
         uses: DavidAnson/markdownlint-cli2-action@main
         with:
-          globs: '**/*.md' # Checks all Markdown files in the repository
+          globs: "**/*.md" # Checks all Markdown files in the repository
           fix: true # automatically fixes simple problems
-          config: '.markdownlint.jsonc'  # if you have a configuration file
-#        continue-on-error: true  # to prevent the build from crashing due to errors in the documentation
+          config: ".markdownlint.jsonc" # if you have a configuration file
+  #        continue-on-error: true  # to prevent the build from crashing due to errors in the documentation
 
   secrets-scan:
     name: 🔑 Secrets Scan
@@ -47,7 +45,7 @@ jobs:
     steps:
       - uses: actions/checkout@main
         with:
-          fetch-depth: 0  # Required for diff scan
+          fetch-depth: 0 # Required for diff scan
 
       - name: TruffleHog Secrets Scan (full)
         if: github.event_name != 'pull_request'

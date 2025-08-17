@@ -1,0 +1,35 @@
+name: Dependabot Automation
+on: pull_request
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  dependabot:
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+
+    steps:
+      - name: Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v2
+
+      - name: Auto-merge Dependabot PRs
+        run: |
+          # Patch - automatically
+          if [[ "${{ steps.metadata.outputs.update-type }}" == "version-update:semver-patch" ]]; then
+            echo "✅ Auto-merging patch update"
+            gh pr merge --auto --squash "$PR_URL"
+          # Minor - only if not production
+          elif [[ "${{ steps.metadata.outputs.update-type }}" == "version-update:semver-minor" ]] && 
+               [[ "${{ steps.metadata.outputs.dependency-type }}" != "direct:production" ]]; then
+            echo "✅ Auto-merging minor dev dependency"
+            gh pr merge --auto --squash "$PR_URL"
+          else
+            echo "⚠️ Manual review required"
+          fi
+        env:
+          PR_URL: ${{github.event.pull_request.html_url}}
+          GH_TOKEN: ${{secrets.GITHUB_TOKEN}}

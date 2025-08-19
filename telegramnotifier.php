@@ -16,6 +16,7 @@ class TelegramNotifier extends Module
             'TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID' => ['type' => 'string', 'default' => ''],
 
             'TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS' => ['type' => 'bool', 'default' => true],
+            'TELEGRAMNOTIFY_UPDATE_CHECK_INTERVAL' => ['type' => 'int', 'default' => 12], // hours
             'TELEGRAMNOTIFY_MAX_MESSAGES' => ['type' => 'int', 'default' => 5],
             'TELEGRAMNOTIFY_MAX_RETRIES' => ['type' => 'int', 'default' => 0],
 
@@ -85,7 +86,7 @@ class TelegramNotifier extends Module
     {
         $this->name = 'telegramnotifier';
         $this->tab = 'administration';
-        $this->version = '1.0.8';
+        $this->version = '1.0.7';
         $this->author = 'alex2276564';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = array('min' => '1.7.0.0', 'max' => _PS_VERSION_);
@@ -156,6 +157,7 @@ class TelegramNotifier extends Module
             $this->setConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID', '') &&
             $this->setConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID', '') &&
             $this->setConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS', true) &&
+            $this->setConfigValue('TELEGRAMNOTIFY_UPDATE_CHECK_INTERVAL', 12) &&
             $this->setConfigValue('TELEGRAMNOTIFY_MAX_MESSAGES', 5) &&
             $this->setConfigValue('TELEGRAMNOTIFY_MAX_RETRIES', 0) &&
             $this->setConfigValue('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE', $this->getDefaultNewOrderTemplate()) &&
@@ -173,6 +175,7 @@ class TelegramNotifier extends Module
             $this->deleteConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID') &&
             $this->deleteConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID') &&
             $this->deleteConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS') &&
+            $this->deleteConfigValue('TELEGRAMNOTIFY_UPDATE_CHECK_INTERVAL') &&
             $this->deleteConfigValue('TELEGRAMNOTIFY_MAX_MESSAGES') &&
             $this->deleteConfigValue('TELEGRAMNOTIFY_MAX_RETRIES') &&
             $this->deleteConfigValue('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE') &&
@@ -439,6 +442,7 @@ class TelegramNotifier extends Module
             $this->getFromCache('TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID'),
             $this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID'),
             $this->getFromCache('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS'),
+            $this->getFromCache('TELEGRAMNOTIFY_UPDATE_CHECK_INTERVAL'),
             $maxMessages,
             $maxRetries,
             $this->getFromCache('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE'),
@@ -768,7 +772,7 @@ class TelegramNotifier extends Module
         return implode("\n", $parts);
     }
 
-    private function validateConfigurationData($botToken, $newOrdersChatId, $adminLoginChatId, $newCustomerChatId, $updateNotifications, $maxMessages, $maxRetries, $newOrderTemplate, $adminLoginTemplate, $newCustomerTemplate)
+    private function validateConfigurationData($botToken, $newOrdersChatId, $adminLoginChatId, $newCustomerChatId, $updateNotifications, $updateCheckInterval, $maxMessages, $maxRetries, $newOrderTemplate, $adminLoginTemplate, $newCustomerTemplate)
     {
         $errors = [];
         $default = false;
@@ -787,6 +791,10 @@ class TelegramNotifier extends Module
 
         if (!is_bool($updateNotifications)) {
             $errors[] = $this->l('Update Notifications must be a boolean value.');
+        }
+
+        if (!is_numeric($updateCheckInterval) || $updateCheckInterval < 1 || !ctype_digit(strval($updateCheckInterval))) {
+            $errors[] = $this->l('Update Check Interval must be a positive integer (hours).');
         }
 
         if (!is_numeric($maxMessages) || $maxMessages < 0 || !ctype_digit(strval($maxMessages))) {
@@ -956,9 +964,12 @@ class TelegramNotifier extends Module
     private function checkForUpdates()
     {
         $lastCheckTime = $this->getFromCache('TELEGRAMNOTIFY_LAST_UPDATE_CHECK');
+        $checkIntervalHours = $this->getFromCache('TELEGRAMNOTIFY_UPDATE_CHECK_INTERVAL');
+        $checkIntervalSeconds = $checkIntervalHours * 3600; // Convert hours to seconds
         $currentTime = time();
 
-        if ($lastCheckTime && ($currentTime - $lastCheckTime < 3600)) {
+        // Check if we need to perform update check based on configured interval
+        if ($lastCheckTime && ($currentTime - $lastCheckTime < $checkIntervalSeconds)) {
             $cachedVersion = $this->getFromCache('TELEGRAMNOTIFY_CACHED_VERSION');
             return !empty($cachedVersion) ? $cachedVersion : '';
         }
@@ -1017,6 +1028,7 @@ class TelegramNotifier extends Module
             $adminLoginChatId = $getConfigValueFromForm('TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID');
             $newCustomerChatId = $getConfigValueFromForm('TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID');
             $updateNotifications = (bool) $getConfigValueFromForm('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS');
+            $updateCheckInterval = $getConfigValueFromForm('TELEGRAMNOTIFY_UPDATE_CHECK_INTERVAL');
             $maxMessages = $getConfigValueFromForm('TELEGRAMNOTIFY_MAX_MESSAGES');
             $maxRetries = $getConfigValueFromForm('TELEGRAMNOTIFY_MAX_RETRIES');
             $newOrderTemplate = $getConfigValueFromForm('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE');
@@ -1029,6 +1041,7 @@ class TelegramNotifier extends Module
                 $adminLoginChatId,
                 $newCustomerChatId,
                 $updateNotifications,
+                $updateCheckInterval,
                 $maxMessages,
                 $maxRetries,
                 $newOrderTemplate,
@@ -1042,6 +1055,7 @@ class TelegramNotifier extends Module
                 $this->setConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID', $adminLoginChatId);
                 $this->setConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID', $newCustomerChatId);
                 $this->setConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS', $updateNotifications);
+                $this->setConfigValue('TELEGRAMNOTIFY_UPDATE_CHECK_INTERVAL', $updateCheckInterval);
                 $this->setConfigValue('TELEGRAMNOTIFY_MAX_MESSAGES', $maxMessages);
                 $this->setConfigValue('TELEGRAMNOTIFY_MAX_RETRIES', $maxRetries);
                 $this->setConfigValue('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE', $validationResult['newOrderTemplate']);
@@ -1135,11 +1149,19 @@ class TelegramNotifier extends Module
                     ],
                     [
                         'type' => 'text',
+                        'label' => $this->l('⏰ Update Check Interval (hours)'),
+                        'name' => 'TELEGRAMNOTIFY_UPDATE_CHECK_INTERVAL',
+                        'size' => 5,
+                        'required' => true,
+                        'desc' => $this->l('How often to check for module updates (in hours). Default: 12 hours.')
+                    ],
+                    [
+                        'type' => 'text',
                         'label' => $this->l('📊 Max Messages per Action'),
                         'name' => 'TELEGRAMNOTIFY_MAX_MESSAGES',
                         'size' => 5,
                         'required' => true,
-                        'desc' => $this->l('Enter the maximum number of messages to send per action (0 for unlimited).')
+                        'desc' => $this->l('Enter the maximum number of messages to send per action (0 for unlimited). Default: 5.')
                     ],
                     [
                         'type' => 'text',
@@ -1147,7 +1169,7 @@ class TelegramNotifier extends Module
                         'name' => 'TELEGRAMNOTIFY_MAX_RETRIES',
                         'size' => 5,
                         'required' => true,
-                        'desc' => $this->l('Number of retry attempts for sending messages (0 to disable, recommended for stable connections).')
+                        'desc' => $this->l('Number of retry attempts for sending messages (0 to disable, recommended for stable connections). Default: 0.')
                     ],
                     [
                         'type' => 'textarea',

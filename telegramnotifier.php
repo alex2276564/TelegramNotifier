@@ -7,39 +7,75 @@ class TelegramNotifier extends Module
 {
     private $configCache = [];
 
-    private $configTypes = [
-        'TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS' => 'bool',
-        'TELEGRAMNOTIFY_MAX_MESSAGES' => 'int',
-        'TELEGRAMNOTIFY_MAX_RETRIES' => 'int',
-        'TELEGRAMNOTIFY_LAST_UPDATE_CHECK' => 'int',
-    ];
+    private function getConfigSchema()
+    {
+        return [
+            'TELEGRAMNOTIFY_BOT_TOKEN' => ['type' => 'string', 'default' => ''],
+            'TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID' => ['type' => 'string', 'default' => ''],
+            'TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID' => ['type' => 'string', 'default' => ''],
+            'TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID' => ['type' => 'string', 'default' => ''],
+
+            'TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS' => ['type' => 'bool', 'default' => true],
+            'TELEGRAMNOTIFY_MAX_MESSAGES' => ['type' => 'int', 'default' => 5],
+            'TELEGRAMNOTIFY_MAX_RETRIES' => ['type' => 'int', 'default' => 0],
+
+            'TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE' => ['type' => 'string', 'default' => $this->getDefaultNewOrderTemplate()],
+            'TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE' => ['type' => 'string', 'default' => $this->getDefaultAdminLoginTemplate()],
+            'TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE' => ['type' => 'string', 'default' => $this->getDefaultNewCustomerTemplate()],
+
+            'TELEGRAMNOTIFY_LAST_UPDATE_CHECK' => ['type' => 'int', 'default' => 0],
+            'TELEGRAMNOTIFY_CACHED_VERSION' => ['type' => 'string', 'default' => ''],
+        ];
+    }
+
+    private function castFromDb($key, $value)
+    {
+        // In PrestaShop, configuration values are stored as strings in database.
+        // We use the schema to consistently cast values back to their intended types.
+        $schema = $this->getConfigSchema();
+        $type = isset($schema[$key]['type']) ? $schema[$key]['type'] : 'string';
+
+        if ($value === false || $value === null) {
+            return $schema[$key]['default'] ?? null;
+        }
+
+        switch ($type) {
+            case 'int':
+                return (int) $value;
+            case 'bool':
+                // PrestaShop stores booleans as '1'/'0' strings; cast to bool here.
+                return (bool) $value;
+            default:
+                return (string) $value;
+        }
+    }
+
+    private function castToDb($key, $value)
+    {
+        // Convert typed values to a database-friendly string representation.
+        $schema = $this->getConfigSchema();
+        $type = isset($schema[$key]['type']) ? $schema[$key]['type'] : 'string';
+
+        switch ($type) {
+            case 'int':
+                return (string) (int) $value;
+            case 'bool':
+                return $value ? '1' : '0';
+            default:
+                return (string) $value;
+        }
+    }
 
     private function getFromCache($key)
     {
-        // If the value is in the cache - return it
-        if (isset($this->configCache[$key])) {
+        if (array_key_exists($key, $this->configCache)) {
             return $this->configCache[$key];
         }
 
-        // If not - get from the database and save to cache
-        $value = $this->getConfigValue($key);
-
-        // In PrestaShop, configuration values are stored as strings in the 'value' column of the 'ps_configuration' table.
-        // This column is of type 'mediumtext', meaning that any configuration value, regardless of its original type (e.g., boolean, integer),
-        // is stored as a string. Therefore, we need to convert these values back to their intended types when retrieving them.
-        // The conversion is based on the predefined types specified in the $configTypes array.
-        if (isset($this->configTypes[$key])) {
-            switch ($this->configTypes[$key]) {
-                case 'int':
-                    $value = (int) $value;
-                    break;
-                case 'bool':
-                    $value = (bool) $value;
-                    break;
-                default:
-                    $value = (string) $value;
-            }
-        }
+        // In PrestaShop, configuration values are stored as strings in the 'ps_configuration' table.
+        // Convert to intended type based on the schema.
+        $rawValue = $this->getConfigValue($key);
+        $value = $this->castFromDb($key, $rawValue);
 
         $this->configCache[$key] = $value;
         return $value;
@@ -73,8 +109,7 @@ class TelegramNotifier extends Module
     private function setConfigValue($key, $value)
     {
         $this->configCache[$key] = $value;
-
-        return Configuration::updateValue($key, $value);
+        return Configuration::updateValue($key, $this->castToDb($key, $value));
     }
 
     private function deleteConfigValue($key)
@@ -86,20 +121,11 @@ class TelegramNotifier extends Module
 
     private function loadConfiguration()
     {
-        $this->configCache = [
-            'TELEGRAMNOTIFY_BOT_TOKEN' => $this->getFromCache('TELEGRAMNOTIFY_BOT_TOKEN'),
-            'TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID' => $this->getFromCache('TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID'),
-            'TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID' => $this->getFromCache('TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID'),
-            'TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID' => $this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID'),
-            'TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS' => (bool) $this->getFromCache('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS'),
-            'TELEGRAMNOTIFY_MAX_MESSAGES' => (int) $this->getFromCache('TELEGRAMNOTIFY_MAX_MESSAGES'),
-            'TELEGRAMNOTIFY_MAX_RETRIES' => (int) $this->getFromCache('TELEGRAMNOTIFY_MAX_RETRIES'),
-            'TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE' => $this->getFromCache('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE'),
-            'TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE' => $this->getFromCache('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE'),
-            'TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE' => $this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE'),
-            'TELEGRAMNOTIFY_LAST_UPDATE_CHECK' => (int) $this->getFromCache('TELEGRAMNOTIFY_LAST_UPDATE_CHECK'),
-            'TELEGRAMNOTIFY_CACHED_VERSION' => $this->getFromCache('TELEGRAMNOTIFY_CACHED_VERSION')
-        ];
+        // Load all known configuration keys as per schema into the local cache.
+        $this->configCache = [];
+        foreach ($this->getConfigSchema() as $key => $meta) {
+            $this->configCache[$key] = $this->getFromCache($key);
+        }
     }
 
     private function isPrestaShop9()
@@ -136,7 +162,7 @@ class TelegramNotifier extends Module
             $this->setConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE', $this->getDefaultAdminLoginTemplate()) &&
             $this->setConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE', $this->getDefaultNewCustomerTemplate()) &&
             $this->setConfigValue('TELEGRAMNOTIFY_LAST_UPDATE_CHECK', 0) &&
-            $this->setConfigValue('TELEGRAMNOTIFY_CACHED_VERSION', false);
+            $this->setConfigValue('TELEGRAMNOTIFY_CACHED_VERSION', '');
     }
 
     public function uninstall()
@@ -841,7 +867,7 @@ class TelegramNotifier extends Module
 
         if ($lastCheckTime && ($currentTime - $lastCheckTime < 3600)) {
             $cachedVersion = $this->getFromCache('TELEGRAMNOTIFY_CACHED_VERSION');
-            return !empty($cachedVersion) ? $cachedVersion : false;
+            return !empty($cachedVersion) ? $cachedVersion : '';
         }
 
         $url = "https://api.github.com/repos/alex2276564/TelegramNotifier/releases/latest";
@@ -853,12 +879,12 @@ class TelegramNotifier extends Module
 
         if ($response['error']) {
             $this->logError('Failed to check for updates: ' . $response['error']);
-            return false;
+            return '';
         }
 
         if ($response['httpCode'] != 200) {
             $this->logError('Failed to check for updates: HTTP code ' . $response['httpCode']);
-            return false;
+            return '';
         }
 
         $release = json_decode($response['result'], true);
@@ -868,7 +894,7 @@ class TelegramNotifier extends Module
             return $release['tag_name'];
         } else {
             $this->setConfigValue('TELEGRAMNOTIFY_CACHED_VERSION', '');
-            return false;
+            return '';
         }
     }
 

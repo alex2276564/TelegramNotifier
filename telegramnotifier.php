@@ -462,7 +462,7 @@ class TelegramNotifier extends Module
             }
         }
 
-        $messageParts = $this->splitMessage($message);
+        $messageParts = $this->splitMessageHtmlSafe($message);
 
         if ($maxMessages > 0) {
             $messageParts = array_slice($messageParts, 0, $maxMessages);
@@ -542,33 +542,126 @@ class TelegramNotifier extends Module
         return $success;
     }
 
-    // Splits a message into parts if its length exceeds the maximum allowed length
-    private function splitMessage($message, $maxLength = 4096)
+    /**
+     * Split long HTML message into chunks not exceeding Telegram's limit (4096 chars),
+     * trying not to break HTML tags (especially <a>...</a>).
+     * Strategy:
+     *  - Pack by lines first to avoid splitting inline tags across parts.
+     *  - For a single line exceeding the limit, split it at safe positions:
+     *    after </a> if possible, otherwise before <a if it opens at the end,
+     *    otherwise at the last whitespace (consuming it), otherwise hard split.
+     */
+    private function splitMessageHtmlSafe($html, $maxLength = 4096)
     {
-        if (mb_strlen($message, 'UTF-8') <= $maxLength) {
-            return [$message];
+        if (mb_strlen($html, 'UTF-8') <= $maxLength) {
+            return [$html];
         }
 
+        $lines = preg_split('/\R/u', $html);
         $parts = [];
-        while (mb_strlen($message, 'UTF-8') > 0) {
-            if (mb_strlen($message, 'UTF-8') <= $maxLength) {
-                $parts[] = $message;
-                break;
-            }
+        $current = '';
 
-            $part = mb_substr($message, 0, $maxLength, 'UTF-8');
-            $lastSpace = mb_strrpos($part, ' ', 0, 'UTF-8');
+        foreach ($lines as $line) {
+            $candidate = ($current === '') ? $line : ($current . "\n" . $line);
 
-            if ($lastSpace !== false) {
-                $parts[] = mb_substr($message, 0, $lastSpace, 'UTF-8');
-                $message = mb_substr($message, $lastSpace + 1, null, 'UTF-8');
+            if (mb_strlen($candidate, 'UTF-8') <= $maxLength) {
+                $current = $candidate;
             } else {
-                $parts[] = $part;
-                $message = mb_substr($message, $maxLength, null, 'UTF-8');
+                if ($current !== '') {
+                    $parts[] = $current;
+                    $current = '';
+                }
+
+                // Split a long single line into safe chunks
+                foreach ($this->splitLongLineHtmlSafe($line, $maxLength) as $chunk) {
+                    if ($current === '') {
+                        $current = $chunk;
+                    } else {
+                        // Join chunks within the same message with a newline,
+                        // to avoid gluing words when we consumed a space.
+                        $withNewline = $current . "\n" . $chunk;
+                        if (mb_strlen($withNewline, 'UTF-8') <= $maxLength) {
+                            $current = $withNewline;
+                        } else {
+                            $parts[] = $current;
+                            $current = $chunk;
+                        }
+                    }
+
+                    if (mb_strlen($current, 'UTF-8') === $maxLength) {
+                        $parts[] = $current;
+                        $current = '';
+                    }
+                }
             }
+        }
+
+        if ($current !== '') {
+            $parts[] = $current;
         }
 
         return $parts;
+    }
+
+    /**
+     * Split a single long line safely:
+     *  - Prefer to break AFTER a complete <a>...</a> pair within the slice.
+     *  - If an <a opens but doesn't close within the slice, break BEFORE <a.
+     *  - Otherwise break at the last whitespace (consuming that space).
+     *  - As a last resort, hard cut at maxLength.
+     */
+    private function splitLongLineHtmlSafe($line, $maxLength)
+    {
+        $chunks = [];
+        $remaining = $line;
+
+        while (mb_strlen($remaining, 'UTF-8') > $maxLength) {
+            $slice = mb_substr($remaining, 0, $maxLength, 'UTF-8');
+            $breakAt = false;
+            $splitOnSpace = false;
+
+            // Prefer to break after a complete <a>...</a> pair within the slice
+            $lastCloseA = mb_strrpos($slice, '</a>', 0, 'UTF-8');
+            $lastOpenA = mb_strrpos($slice, '<a ', 0, 'UTF-8');
+
+            if ($lastCloseA !== false && $lastOpenA !== false && $lastOpenA < $lastCloseA) {
+                $breakAt = $lastCloseA + 4; // length of '</a>'
+            }
+
+            // If there is an opening <a but no closing </a> inside the slice, break BEFORE <a
+            if ($breakAt === false && $lastOpenA !== false && ($lastCloseA === false || $lastOpenA > $lastCloseA)) {
+                $breakAt = $lastOpenA;
+            }
+
+            // Otherwise, break at the last whitespace
+            if ($breakAt === false) {
+                $lastSpace = mb_strrpos($slice, ' ', 0, 'UTF-8');
+                if ($lastSpace !== false) {
+                    $breakAt = $lastSpace;
+                    $splitOnSpace = true; // consume the whitespace at the break point
+                }
+            }
+
+            // As a last resort, hard cut
+            if ($breakAt === false || $breakAt < 1) {
+                $breakAt = $maxLength;
+                $splitOnSpace = false;
+            }
+
+            // If we split on a whitespace, consume it (avoid leading space in next chunk)
+            if ($splitOnSpace) {
+                $breakAt++;
+            }
+
+            $chunks[] = mb_substr($remaining, 0, $breakAt, 'UTF-8');
+            $remaining = mb_substr($remaining, $breakAt, null, 'UTF-8');
+        }
+
+        if ($remaining !== '') {
+            $chunks[] = $remaining;
+        }
+
+        return $chunks;
     }
 
     private function executeCurlRequest($urls, $postData = null, $headers = [], $multiRequest = false)

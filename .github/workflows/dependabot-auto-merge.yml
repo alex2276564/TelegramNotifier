@@ -1,10 +1,38 @@
 name: Dependabot Automation
-on: pull_request
+
+on:
+  pull_request:
 
 permissions:
   contents: write
   pull-requests: write
   issues: write
+
+# ==========
+# CONFIG (edit values only)
+# ==========
+env:
+  # Merge method to prefer: merge | squash | rebase
+  MERGE_METHOD: squash
+
+  # Max update level to auto-merge for development deps: none | patch | minor | major
+  MERGE_DEV_LEVEL: minor
+
+  # Max update level to auto-merge for production deps: none | patch | minor | major
+  MERGE_PROD_LEVEL: minor
+
+  # Max update level to auto-merge for security updates: none | patch | minor | major
+  MERGE_SECURITY_LEVEL: minor
+
+  # If true — enable auto-merge and wait for checks. If repo doesn’t allow auto-merge,
+  # the workflow will leave PR open and add a comment (no failure). If the repo does
+  # not have Branch Protection Rules, the workflow will be merged immediately (no failure).
+  WAIT_FOR_CI: 'false'
+# ==========
+
+concurrency:
+  group: dependabot-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
 
 jobs:
   dependabot:
@@ -13,23 +41,134 @@ jobs:
 
     steps:
       - name: Dependabot metadata
-        id: metadata
+        id: meta
         uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Auto-merge Dependabot PRs
-        run: |
-          # Patch - automatically
-          if [[ "${{ steps.metadata.outputs.update-type }}" == "version-update:semver-patch" ]]; then
-            echo "✅ Auto-merging patch update"
-            gh pr merge --auto --squash "$PR_URL"
-          # Minor - only if not production
-          elif [[ "${{ steps.metadata.outputs.update-type }}" == "version-update:semver-minor" ]] && 
-               [[ "${{ steps.metadata.outputs.dependency-type }}" != "direct:production" ]]; then
-            echo "✅ Auto-merging minor dev dependency"
-            gh pr merge --auto --squash "$PR_URL"
-          else
-            echo "⚠️ Manual review required"
-          fi
+      - name: Decide and (auto)merge
+        shell: bash
         env:
-          PR_URL: ${{github.event.pull_request.html_url}}
-          GH_TOKEN: ${{secrets.GITHUB_TOKEN}}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UPDATE_TYPE: ${{ steps.meta.outputs.update-type }}
+          DEP_TYPE: ${{ steps.meta.outputs.dependency-type }} # direct:production | direct:development | indirect
+          SEC_SEVERITY: ${{ steps.meta.outputs.security-advisory-severity }} # non-empty for security updates
+          REPO: ${{ github.repository }}
+          MERGE_METHOD: ${{ env.MERGE_METHOD }}
+          MERGE_DEV_LEVEL: ${{ env.MERGE_DEV_LEVEL }}
+          MERGE_PROD_LEVEL: ${{ env.MERGE_PROD_LEVEL }}
+          MERGE_SECURITY_LEVEL: ${{ env.MERGE_SECURITY_LEVEL }}
+          WAIT_FOR_CI: ${{ env.WAIT_FOR_CI }}
+        run: |
+          set -euo pipefail
+
+          lc() { echo "$1" | tr '[:upper:]' '[:lower:]' | xargs; }
+          to_num() {
+            case "$(lc "$1")" in
+              none) echo 0 ;;
+              patch) echo 1 ;;
+              minor) echo 2 ;;
+              major) echo 3 ;;
+              *) echo 0 ;;
+            esac
+          }
+
+          # Determine PR semver level
+          case "$UPDATE_TYPE" in
+            version-update:semver-patch) PR_LEVEL="patch" ;;
+            version-update:semver-minor) PR_LEVEL="minor" ;;
+            version-update:semver-major) PR_LEVEL="major" ;;
+            *) PR_LEVEL="major" ;;
+          esac
+          
+
+          # Pick policy: security > prod/dev
+          if [ -n "${SEC_SEVERITY:-}" ]; then
+            ALLOWED="${MERGE_SECURITY_LEVEL}"
+            REASON="security update"
+          else
+            if [ "$(lc "$DEP_TYPE")" = "direct:production" ]; then
+              ALLOWED="${MERGE_PROD_LEVEL}"
+              REASON="prod dependency"
+            else
+              ALLOWED="${MERGE_DEV_LEVEL}"
+              REASON="dev/indirect dependency"
+            fi
+          fi
+
+          PR_N=$(to_num "$PR_LEVEL")
+          ALLOWED_N=$(to_num "$ALLOWED")
+          echo "Update: $UPDATE_TYPE | Dep: $DEP_TYPE | Sec: ${SEC_SEVERITY:-none}"
+          echo "PR level: $PR_LEVEL -> allowed: $ALLOWED ($REASON)"
+
+          # Not allowed by policy -> do nothing (no failure)
+          if [ "$ALLOWED_N" -lt "$PR_N" ] || [ "$ALLOWED_N" -eq 0 ]; then
+            echo "Manual review required (policy '$ALLOWED')."
+            exit 0
+          fi
+
+          # Check repo capabilities (auto-merge + allowed merge methods)
+          OWNER="${REPO%/*}"
+          NAME="${REPO#*/}"
+
+          # Build GraphQL query (escape $ to avoid shell expansion)
+          query="query(\$o:String!,\$n:String!){
+            repository(owner:\$o,name:\$n){
+              autoMergeAllowed
+              squashMergeAllowed
+              rebaseMergeAllowed
+              mergeCommitAllowed
+            }
+          }"
+
+          # One call, then parse with jq (no here-strings / no process substitution)
+          repo_json=$(gh api graphql -f query="$query" -F o="$OWNER" -F n="$NAME")
+
+          AUTO_ALLOWED=$(printf '%s' "$repo_json" | jq -r '.data.repository.autoMergeAllowed')
+          SQUASH_ALLOWED=$(printf '%s' "$repo_json" | jq -r '.data.repository.squashMergeAllowed')
+          REBASE_ALLOWED=$(printf '%s' "$repo_json" | jq -r '.data.repository.rebaseMergeAllowed')
+          MERGE_ALLOWED=$(printf '%s' "$repo_json" | jq -r '.data.repository.mergeCommitAllowed')
+
+          # Determine merge flag based on repo allowances (with fallback)
+          REQ_METHOD="$(lc "${MERGE_METHOD}")"
+          choose_flag() {
+            local m="$1"
+            case "$m" in
+              squash) [ "$SQUASH_ALLOWED" = "true" ] && { echo "--squash"; return; } ;;
+              rebase) [ "$REBASE_ALLOWED" = "true" ] && { echo "--rebase"; return; } ;;
+              merge)  [ "$MERGE_ALLOWED"  = "true" ] && { echo "--merge";  return; } ;;
+            esac
+            # Fallbacks: squash > merge > rebase
+            if [ "$SQUASH_ALLOWED" = "true" ]; then echo "--squash"; return; fi
+            if [ "$MERGE_ALLOWED"  = "true" ]; then echo "--merge";  return; fi
+            if [ "$REBASE_ALLOWED" = "true" ]; then echo "--rebase"; return; fi
+            echo ""  # none allowed
+          }
+          FLAG="$(choose_flag "$REQ_METHOD")"
+
+          if [ -z "$FLAG" ]; then
+            echo "No merge methods allowed by repo settings. Leaving PR open."
+            gh pr comment "$PR_URL" -b "Cannot auto-merge: all merge methods are disabled in repository settings."
+            exit 0
+          fi
+
+          if [ "$(lc "${WAIT_FOR_CI:-true}")" = "true" ]; then
+            if [ "$AUTO_ALLOWED" = "true" ]; then
+              echo "Enabling auto-merge (flag: $FLAG)"
+              gh pr merge "$PR_URL" --auto "$FLAG" || {
+                echo "Auto-merge enable failed (likely required checks not passing yet)."
+                exit 0
+              }
+            else
+              echo "Auto-merge is disabled in repo settings. Leaving PR open."
+              gh pr comment "$PR_URL" -b "Auto-merge is disabled for this repository. Enable it in Settings or set WAIT_FOR_CI=false if you prefer immediate merge (subject to branch protection)."
+              exit 0
+            fi
+          else
+            echo "Merging immediately (flag: $FLAG)"
+            gh pr merge "$PR_URL" "$FLAG" || {
+              echo "Immediate merge failed (branch protection / required checks). Leaving PR open."
+              exit 0
+            }
+          fi

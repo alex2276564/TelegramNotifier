@@ -69,10 +69,8 @@ jobs:
       - name: Lint Markdown files
         uses: DavidAnson/markdownlint-cli2-action@main
         with:
-          globs: "**/*.md" # Checks all Markdown files in the repository
-          fix: true # automatically fixes simple problems
-          config: ".markdownlint.jsonc" # if you have a configuration file
-  #        continue-on-error: true  # to prevent the build from crashing due to errors in the documentation
+          globs: "**/*.md"
+          config: ".markdownlint.jsonc"
 
   secrets-scan-trufflehog:
     name: 🔑 Secrets Scan

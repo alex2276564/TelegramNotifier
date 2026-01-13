@@ -1,0 +1,426 @@
+// ================================================================
+// 🔄 Renovate Configuration
+// ================================================================
+// Universal dependency automation config for any project type.
+// Designed for security-first auto-updates with minimal manual intervention.
+//
+// 📖 Documentation: https://docs.renovatebot.com
+// 🎯 Philosophy:
+//    - Security updates: immediate auto-merge
+//    - Stable releases: wait 3 days before updating
+//    - Patch/minor: auto-merge (after stabilization)
+//    - Major: manual review (breaking changes)
+//    - Dev dependencies: grouped into single PR (less spam)
+//
+// 🔧 To adapt for other projects:
+//    1. Update enabledManagers (npm, composer, pip, etc.)
+//    2. Adjust matchManagers in packageRules
+//    3. Customize project-specific ignore rules
+// ================================================================
+
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+
+  // ================================================================
+  // 🎯 CORE CONFIGURATION
+  // ================================================================
+  // Base presets define sensible defaults for most projects
+  // ================================================================
+
+  "extends": [
+    "config:recommended"      // Recommended baseline config
+  ],
+
+  // ================================================================
+  // ⏰ SCHEDULE & TIMING
+  // ================================================================
+  // Controls when Renovate creates PRs for dependency updates.
+  //
+  // 💡 KEY CONCEPT: Day-only schedules vs Time-specific schedules
+  // ----------------------------------------------------------------
+  // Day-only (recommended):   "on monday", "every weekend"
+  // Time-specific (complex):  "before 6am on monday", "after 10pm"
+  //
+  // ⚠️ WHY AVOID time-specific schedules?
+  // ----------------------------------------------------------------
+  // Time-based schedules create synchronization issues:
+  //
+  // 1. Timezone complexity:
+  //    - Your VPS cron runs in timezone A (e.g., UTC)
+  //    - GitHub Actions runs in timezone B (e.g., America/New_York)
+  //    - Mend.io cloud runs in unknown timezone C
+  //    - Result: Same config behaves differently everywhere!
+  //
+  // 2. Clock drift and DST:
+  //    - System clocks may be slightly off
+  //    - Daylight Saving Time changes offset
+  //    - Edge cases near midnight (is it Monday or Tuesday?)
+  //
+  // 3. Maintenance burden:
+  //    - Moving servers → recalculate time offsets
+  //    - Adding CI environments → debug schedule mismatches
+  //    - Time-specific logic is hard to reason about
+  //
+  // ✅ SOLUTION: Two-level scheduling architecture
+  // ----------------------------------------------------------------
+  // Separate WHEN (cron) from WHICH DAYS (renovate.json):
+  //
+  //   Level 1 - Cron (VPS/CI):
+  //     Controls execution frequency (when Renovate process starts)
+  //     Example: 0 1 * * * = daily at 01:00
+  //
+  //   Level 2 - Schedule (renovate.json):
+  //     Controls PR creation days (which days PRs are allowed)
+  //     Example: "on monday" = only Mondays (any time of day)
+  //
+  // Benefits:
+  //   • No time synchronization needed (only day matters)
+  //   • Same config works across all environments
+  //   • Easy to understand and maintain
+  //
+  // ================================================================
+  // 📋 OPTION 1: Universal (Recommended for flexibility)
+  // ================================================================
+  // Best for: Multiple repos with different schedules
+  //
+  // Setup:
+  // ------
+  // VPS Cron (run Renovate daily):
+  //   0 1 * * * /root/renovate/run-renovate.sh
+  //
+  // renovate.json (filter which days to create PRs):
+  //   "schedule": ["on monday"]  ← This setting (day-based)
+  //
+  // How it works:
+  // -------------
+  // • Renovate runs:  7 times/week (cron: every day at 01:00)
+  // • PRs created:    1 time/week (schedule: Monday only)
+  // • Wasted runs:    6/week (Renovate exits early on non-Monday)
+  //
+  // ✅ Pros:
+  //   • Universal: Works on VPS, GitHub Actions, GitLab CI, Mend.io
+  //   • Flexible: Different repos can use different days
+  //     - Repo A: "on monday"    → PRs on Monday
+  //     - Repo B: "on wednesday" → PRs on Wednesday
+  //     - All use same cron (daily), different schedules filter
+  //   • No timezone issues: "on monday" matches any time on Monday
+  //   • Add/remove repos: No cron changes needed
+  //
+  // ⚠️ Cons:
+  //   • Resource usage: Renovate starts 6 extra times (does nothing)
+  //   • Minimal impact: Each wasted run takes ~5-10 seconds
+  //
+  // 💡 TL;DR:
+  // Run Renovate daily via cron, let renovate.json filter days.
+  // You can deploy multiple Renovate instances across different
+  // servers/CI systems without worrying about time synchronization.
+  // Each repo's schedule is self-contained and portable.
+  //
+  // ================================================================
+  // 📋 OPTION 2: Optimized (Recommended for single schedule)
+  // ================================================================
+  // Best for: All repos update on same day, want to save resources
+  //
+  // Setup:
+  // ------
+  // VPS Cron (run Renovate only on Monday):
+  //   0 1 * * 1 /root/renovate/run-renovate.sh
+  //   #       ↑
+  //   #       └─ 1 = Monday (0=Sun, 1=Mon, ..., 6=Sat)
+  //
+  // renovate.json (allow PRs any time):
+  //   "schedule": ["at any time"]  # or omit entirely (default)
+  //
+  // How it works:
+  // -------------
+  // • Renovate runs:  1 time/week (cron: Monday only)
+  // • PRs created:    1 time/week (schedule: always allowed)
+  // • Wasted runs:    0/week (runs only when needed)
+  //
+  // ✅ Pros:
+  //   • Efficient: No wasted Renovate executions
+  //   • Simple: One schedule to maintain (in cron)
+  //   • Resource-friendly: VPS not taxed on unused days
+  //
+  // ⚠️ Cons:
+  //   • Less flexible: All repos must use same day
+  //     - If you want Repo B on Wednesday → must add second cron job
+  //   • Portability: Moving to different CI requires cron reconfiguration
+  //   • Multi-environment: Harder to sync if using VPS + GitHub Actions
+  //
+  // 💡 TL;DR:
+  // Control schedule entirely via cron, renovate.json has no day filter.
+  // More efficient but less portable. Requires cron changes if you
+  // want different schedules per repo or add new environments.
+  //
+  // ================================================================
+  // 🎯 SCHEDULE SYNTAX REFERENCE
+  // ================================================================
+  // Common patterns (day-based, timezone-safe):
+  // -------------------------------------------
+  // "at any time"       → No filtering (always allowed)
+  // "on monday"         → Any time Monday (00:00-23:59 in any TZ)
+  // "on friday"         → Any time Friday
+  // "every weekend"     → Saturday and Sunday
+  // "every weekday"     → Monday through Friday
+  //
+  // Time-specific patterns (avoid unless necessary):
+  // ------------------------------------------------
+  // "before 6am on monday"     → ⚠️ Timezone-dependent
+  // "after 10pm every weekday" → ⚠️ Complex to synchronize
+  // ================================================================
+
+  "schedule": [
+    "on monday"  // OPTION 1: Day-only schedule (timezone-safe, portable)
+  ],
+
+  "timezone": "UTC",  // Reference timezone for schedule string parsing
+                      // Note: For day-only schedules like "on monday",
+                      // timezone setting has minimal effect (day boundaries
+                      // are fuzzy). Mainly matters for time-specific schedules.
+
+  // ================================================================
+  // 🎛️ RATE LIMITING
+  // ================================================================
+  // Prevents PR/MR spam and controls update flow
+  //
+  // Recommended values:
+  // - Small projects: 5-10 concurrent
+  // - Medium projects: 10-20 concurrent
+  // - Large monorepos: 20-50 concurrent
+  // ================================================================
+
+  "prConcurrentLimit": 10,    // Max 10 PRs open at once
+  "prHourlyLimit": 0,         // No hourly limit (controlled by concurrent only)
+
+  // ================================================================
+  // 🔧 PACKAGE MANAGERS
+  // ================================================================
+  // Explicitly enable only the managers you need for better performance.
+  // Renovate auto-detects but explicit config is more predictable.
+  //
+  // Common managers:
+  // - gradle, maven (Java/Kotlin)
+  // - npm, yarn, pnpm (JavaScript/TypeScript)
+  // - composer (PHP)
+  // - pip, pipenv, poetry (Python)
+  // - bundler (Ruby)
+  // - cargo (Rust)
+  // - gomod (Go)
+  // - docker, dockerfile
+  // - github-actions, circleci, gitlab-ci
+  //
+  // 📝 Customize this list for your project stack!
+  // ================================================================
+
+  "enabledManagers": [
+    "github-actions"          // GitHub Actions: .github/workflows/*.yml
+  ],
+
+  // ================================================================
+  // 🔐 SECURITY SETTINGS
+  // ================================================================
+  // Stability and security policies for dependency updates
+  // ================================================================
+
+  // Wait N days before updating to a new version (except security fixes)
+  // This allows time for community to discover critical bugs in new releases
+  // Security updates bypass this delay (minimumReleaseAge ignores vulnerabilityAlerts)
+  "minimumReleaseAge": "3 days",
+
+  // OSV (Open Source Vulnerabilities) integration
+  // Provides additional vulnerability data beyond GitHub Security Advisories
+  "osvVulnerabilityAlerts": true,
+
+  // ================================================================
+  // 🤖 AUTO-MERGE CONFIGURATION
+  // ================================================================
+  // Controls how and when PRs are automatically merged
+  //
+  // Strategies:
+  // 1. platformAutomerge: true
+  //    - Uses GitHub/GitLab native auto-merge
+  //    - Requires Branch Protection rules
+  //    - Waits for required status checks
+  //
+  // 2. platformAutomerge: false + automergeType: "pr"
+  //    - Renovate merges directly via API
+  //    - Does NOT require Branch Protection
+  //    - Controlled by ignoreTests setting
+  //
+  // Current config: Strategy 2 (no Branch Protection required)
+  // ================================================================
+
+  "automerge": false,             // Don't auto-merge by default (use packageRules)
+
+  "platformAutomerge": false,     // Don't use native GitHub/GitLab auto-merge
+                                  // (⚠️ would require Branch Protection)
+
+  "automergeType": "pr",          // Renovate merges PRs directly via API
+
+  "automergeStrategy": "squash",  // Squash commits when merging (clean history)
+
+  "ignoreTests": true,            // Merge immediately without waiting for CI
+                                  // Set to false if you want to wait for CI
+                                  // (⚠️ requires more complex setup with Branch Protection)
+
+  // ================================================================
+  // 📦 DEPENDENCY UPDATE RULES
+  // ================================================================
+  // Fine-grained policies per dependency type, ecosystem, or version bump
+  //
+  // Rule matching is based on:
+  // - matchManagers: which package manager (gradle, npm, pip, etc.)
+  // - matchUpdateTypes: version bump type (major, minor, patch)
+  // - matchPackageNames: specific package names
+  // - matchPackagePatterns: regex pattern for package names
+  // - matchDepTypes: dependency type (dependencies, devDependencies, etc.)
+  //
+  // Rules are evaluated top-to-bottom; later rules override earlier ones
+  // ================================================================
+
+  "packageRules": [
+
+    // ================================================================
+    // 🔄 UPDATE CHANNELS (Patch/Minor/Major)
+    // ================================================================
+    // Define auto-merge behavior per semantic version bump type
+    // ================================================================
+
+    {
+      "description": "🟢 Patch updates: auto-merge (bug fixes, backwards-compatible)",
+      "matchUpdateTypes": ["patch"],
+      "automerge": true,
+      // Examples: 1.2.3 → 1.2.4, 2.0.0 → 2.0.1
+      // Should be safe to auto-merge (except for known buggy releases)
+    },
+
+    {
+      "description": "🟡 Minor updates: auto-merge (new features, backwards-compatible)",
+      "matchUpdateTypes": ["minor"],
+      "automerge": true,
+      // Examples: 1.2.0 → 1.3.0, 2.0.0 → 2.1.0
+      // Usually safe if project follows semantic versioning
+    },
+
+    {
+      "description": "🔴 Major updates: manual review (breaking changes expected)",
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      // Examples: 1.0.0 → 2.0.0, 2.5.3 → 3.0.0
+      // Requires manual review: API changes, deprecations, migrations
+    },
+
+    // ================================================================
+    // 📦 DEV / TEST DEPENDENCIES GROUPING
+    // ================================================================
+    // Group all development/test dependencies into a single PR to
+    // reduce noise. This is generic and can be adapted per ecosystem.
+    //
+    // Notes:
+    // - matchDepTypes values are manager-specific.
+    // - For npm:        devDependencies, optionalDependencies (etc.)
+    // - For Composer:   require-dev
+    // - For Gradle:     configuration names (testImplementation, etc.)
+    // - For Maven:      test, provided (depending on setup)
+    //
+    // Adjust the list below to match your actual stack.
+    // ================================================================
+    {
+      "description": "📦 Group all dev/test dependencies into a single PR",
+      "matchDepTypes": [
+        // Node.js / npm / yarn
+        "devDependencies",
+        "optionalDependencies",
+
+        // PHP / Composer
+        "require-dev",
+
+        // Generic "test" buckets
+        "test",
+        "testDependencies",
+
+        // Gradle configurations used for tests/dev
+        "testCompileOnly",
+        "testImplementation",
+        "testRuntimeOnly",
+        "testAnnotationProcessor"
+      ],
+      "groupName": "Dev / Test dependencies",
+      "groupSlug": "dev-test-deps",
+      // Do NOT split by major/minor/patch inside this group:
+      "separateMajorMinor": false,
+      "separateMinorPatch": false
+    },
+
+    // ================================================================
+    // 🚨 SECURITY UPDATES
+    // ================================================================
+    // Vulnerability fixes bypass stabilization delay and auto-merge immediately
+    // ================================================================
+
+    {
+      "description": "🚨 Security: bypass minimumReleaseAge and auto-merge immediately",
+      "matchUpdateTypes": ["patch", "minor"],
+      "matchDatasources": ["*"],
+      // Override minimumReleaseAge for security fixes
+      "minimumReleaseAge": "0 days",
+      "automerge": true,
+      // Note: vulnerabilityAlerts.automerge (below) handles security updates,
+      // but this rule ensures patch/minor security fixes merge immediately
+    },
+
+    // ================================================================
+    // 💬 COMMIT MESSAGE FORMATTING
+    // ================================================================
+    // Customize commit messages per package manager
+    //
+    // Default format (with semanticCommits: enabled):
+    //   "chore(deps): update dependency foo to v2.0.0"
+    //
+    // Custom format (with semanticCommits: disabled):
+    //   "[Manager] Update dependency foo to v2.0.0"
+    //
+    // 📝 Adapt these rules for your package managers:
+    //    - Gradle → [Gradle]
+    //    - npm → [npm]
+    //    - Composer → [Composer]
+    //    - pip → [Python]
+    // ================================================================
+
+    {
+      "description": "💬 Gradle: custom commit message prefix",
+      "matchManagers": ["gradle", "gradle-wrapper"],
+      "commitMessagePrefix": "[Gradle] ",
+      "semanticCommits": "disabled",
+      // Example: "[Gradle] Update dependency com.google.guava:guava to v32.0.0"
+    },
+
+    {
+      "description": "💬 GitHub Actions: custom commit message prefix",
+      "matchManagers": ["github-actions"],
+      "commitMessagePrefix": "[GitHub Actions] ",
+      "semanticCommits": "disabled",
+      // Example: "[GitHub Actions] Update actions/checkout action to v4.2.0"
+    },
+  ],
+
+  // ================================================================
+  // 🔐 VULNERABILITY ALERTS
+  // ================================================================
+  // GitHub/GitLab Security Advisories integration
+  // Auto-merge security fixes to minimize exposure window
+  //
+  // Sources:
+  // - GitHub Security Advisories
+  // - OSV Database (if osvVulnerabilityAlerts: true)
+  // - npm audit / Snyk / Dependabot (if enabled)
+  // ================================================================
+
+  "vulnerabilityAlerts": {
+    "enabled": true,              // Enable security vulnerability detection
+    "automerge": true,            // Auto-merge security updates immediately
+                                  // Security updates bypass minimumReleaseAge and merge ASAP
+                                  // This prioritizes security over stability
+  }
+}

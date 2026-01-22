@@ -191,55 +191,35 @@ class TelegramNotifier extends Module
             $customer = $params['newCustomer'];
             $newCustomerTemplate = $this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE');
 
-            $placeholders = [
-                '{customer_name}' => '',
-                '{customer_email}' => '',
-                '{ip_address}' => '',
-                '{country}' => '',
-                '{date_time}' => '',
-                '{birthday}' => '',
-                '{gender}' => '',
-                '{newsletter}' => '',
-            ];
-
-            if (strpos($newCustomerTemplate, '{customer_name}') !== false) {
-                $placeholders['{customer_name}'] = $customer->firstname . ' ' . $customer->lastname;
-            }
-
-            if (strpos($newCustomerTemplate, '{customer_email}') !== false) {
-                $placeholders['{customer_email}'] = $customer->email;
-            }
-
-            if (strpos($newCustomerTemplate, '{ip_address}') !== false || strpos($newCustomerTemplate, '{country}') !== false) {
-                $ip = Tools::getRemoteAddr();
-
-                if (strpos($newCustomerTemplate, '{ip_address}') !== false) {
-                    $placeholders['{ip_address}'] = $ip;
+            // Lazy providers to compute only when a placeholder exists in the template
+            $ipProvider = function () {
+                static $ip = null;
+                if ($ip === null) {
+                    $ip = Tools::getRemoteAddr();
                 }
+                return $ip;
+            };
 
-                if (strpos($newCustomerTemplate, '{country}') !== false) {
-                    $placeholders['{country}'] = $this->getCountryFromIP($ip);
-                }
-            }
-
-            if (strpos($newCustomerTemplate, '{date_time}') !== false) {
-                $placeholders['{date_time}'] = date('Y-m-d H:i:s');
-            }
-
-            if (strpos($newCustomerTemplate, '{birthday}') !== false) {
-                $birthday = $customer->birthday;
-                $placeholders['{birthday}'] = !empty($birthday) ? date('Y-m-d', strtotime($birthday)) : '';
-            }
-
-            if (strpos($newCustomerTemplate, '{gender}') !== false) {
-                $placeholders['{gender}'] = $this->getGenderName($customer->id_gender);
-            }
-
-            if (strpos($newCustomerTemplate, '{newsletter}') !== false) {
-                $placeholders['{newsletter}'] = $customer->newsletter ? '✅' : '❌';
-            }
-
-            $message = strtr($newCustomerTemplate, $placeholders);
+            $message = $this->fillTemplate($newCustomerTemplate, [
+                '{customer_name}' => function () use ($customer) {
+                    return $customer->firstname . ' ' . $customer->lastname; },
+                '{customer_email}' => function () use ($customer) {
+                    return $customer->email; },
+                '{ip_address}' => function () use ($ipProvider) {
+                    return $ipProvider(); },
+                '{country}' => function () use ($ipProvider) {
+                    return $this->getCountryFromIP($ipProvider()); },
+                '{date_time}' => function () {
+                    return date('Y-m-d H:i:s'); },
+                '{birthday}' => function () use ($customer) {
+                    $birthday = $customer->birthday;
+                    return !empty($birthday) ? date('Y-m-d', strtotime($birthday)) : '';
+                },
+                '{gender}' => function () use ($customer) {
+                    return $this->getGenderName($customer->id_gender); },
+                '{newsletter}' => function () use ($customer) {
+                    return $customer->newsletter ? '✅' : '❌'; },
+            ]);
 
             $this->sendTelegramMessage($message, 'new_customer');
         }
@@ -251,39 +231,26 @@ class TelegramNotifier extends Module
             $employee = $params['employee'];
             $adminLoginTemplate = $this->getFromCache('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE');
 
-            $placeholders = [
-                '{employee_name}' => '',
-                '{employee_email}' => '',
-                '{ip_address}' => '',
-                '{country}' => '',
-                '{date_time}' => '',
-            ];
-
-            if (strpos($adminLoginTemplate, '{employee_name}') !== false) {
-                $placeholders['{employee_name}'] = $employee->firstname . ' ' . $employee->lastname;
-            }
-
-            if (strpos($adminLoginTemplate, '{employee_email}') !== false) {
-                $placeholders['{employee_email}'] = $employee->email;
-            }
-
-            if (strpos($adminLoginTemplate, '{ip_address}') !== false || strpos($adminLoginTemplate, '{country}') !== false) {
-                $ip = Tools::getRemoteAddr();
-
-                if (strpos($adminLoginTemplate, '{ip_address}') !== false) {
-                    $placeholders['{ip_address}'] = $ip;
+            $ipProvider = function () {
+                static $ip = null;
+                if ($ip === null) {
+                    $ip = Tools::getRemoteAddr();
                 }
+                return $ip;
+            };
 
-                if (strpos($adminLoginTemplate, '{country}') !== false) {
-                    $placeholders['{country}'] = $this->getCountryFromIP($ip);
-                }
-            }
-
-            if (strpos($adminLoginTemplate, '{date_time}') !== false) {
-                $placeholders['{date_time}'] = date('Y-m-d H:i:s');
-            }
-
-            $message = strtr($adminLoginTemplate, $placeholders);
+            $message = $this->fillTemplate($adminLoginTemplate, [
+                '{employee_name}' => function () use ($employee) {
+                    return $employee->firstname . ' ' . $employee->lastname; },
+                '{employee_email}' => function () use ($employee) {
+                    return $employee->email; },
+                '{ip_address}' => function () use ($ipProvider) {
+                    return $ipProvider(); },
+                '{country}' => function () use ($ipProvider) {
+                    return $this->getCountryFromIP($ipProvider()); },
+                '{date_time}' => function () {
+                    return date('Y-m-d H:i:s'); },
+            ]);
 
             $this->sendTelegramMessage($message, 'admin_login');
         }
@@ -293,120 +260,113 @@ class TelegramNotifier extends Module
     {
         if (!empty($this->getFromCache('TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID'))) {
             $order = $params['order'];
-            $customer = new Customer($order->id_customer);
-            $address = new Address($order->id_address_delivery);
-
             $newOrderTemplate = $this->getFromCache('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE');
 
-            $placeholders = [
-                '{order_reference}' => '',
-                '{shop_name}' => '',
-                '{customer_name}' => '',
-                '{customer_email}' => '',
-                '{ip_address}' => '',
-                '{country}' => '',
-                '{date_time}' => '',
-                '{phone_number}' => '',
-                '{total_paid}' => '',
-                '{shipping_address}' => '',
-                '{delivery_method}' => '',
-                '{payment_method}' => '',
-                '{products_list}' => '',
-                '{order_comment}' => '',
-            ];
-
-            if (strpos($newOrderTemplate, '{order_reference}') !== false) {
-                $placeholders['{order_reference}'] = $order->reference;
-            }
-
-            if (strpos($newOrderTemplate, '{shop_name}') !== false) {
-                $shop = new Shop($order->id_shop);
-                $placeholders['{shop_name}'] = $shop->name;
-            }
-
-            if (strpos($newOrderTemplate, '{customer_name}') !== false) {
-                $placeholders['{customer_name}'] = $customer->firstname . ' ' . $customer->lastname;
-            }
-
-            if (strpos($newOrderTemplate, '{customer_email}') !== false) {
-                $placeholders['{customer_email}'] = $customer->email;
-            }
-
-            if (strpos($newOrderTemplate, '{ip_address}') !== false || strpos($newOrderTemplate, '{country}') !== false) {
-                $ip = Tools::getRemoteAddr();
-
-                if (strpos($newOrderTemplate, '{ip_address}') !== false) {
-                    $placeholders['{ip_address}'] = $ip;
+            // Lazy accessors to avoid unnecessary instantiations when placeholders are not used
+            $getCustomer = function () use ($order) {
+                static $customer = null;
+                if ($customer === null) {
+                    $customer = new Customer($order->id_customer);
                 }
+                return $customer;
+            };
 
-                if (strpos($newOrderTemplate, '{country}') !== false) {
-                    $placeholders['{country}'] = $this->getCountryFromIP($ip);
+            $getAddress = function () use ($order) {
+                static $address = null;
+                if ($address === null) {
+                    $address = new Address($order->id_address_delivery);
                 }
-            }
+                return $address;
+            };
 
-            if (strpos($newOrderTemplate, '{date_time}') !== false) {
-                $placeholders['{date_time}'] = date('Y-m-d H:i:s');
-            }
-
-            if (strpos($newOrderTemplate, '{phone_number}') !== false) {
-                $placeholders['{phone_number}'] = !empty($address->phone_mobile) ?
-                    $address->phone_mobile : $address->phone;
-            }
-
-            if (strpos($newOrderTemplate, '{total_paid}') !== false) {
-                $totalPaid = $this->getOrderTotalPaid($order);
-                $placeholders['{total_paid}'] = $this->formatPrice($totalPaid, $order->id_currency);
-            }
-
-            if (strpos($newOrderTemplate, '{shipping_address}') !== false) {
-                $placeholders['{shipping_address}'] = $this->formatShippingAddress($address);
-            }
-
-            if (strpos($newOrderTemplate, '{delivery_method}') !== false) {
-                $carrier = new Carrier($order->id_carrier);
-                $placeholders['{delivery_method}'] = $carrier->name;
-            }
-
-            if (strpos($newOrderTemplate, '{payment_method}') !== false) {
-                $placeholders['{payment_method}'] = $order->payment;
-            }
-
-            if (strpos($newOrderTemplate, '{products_list}') !== false) {
-                $productslist = '';
-                $products = $order->getProducts();
-                $currency = new Currency($order->id_currency);
-                $link = Context::getContext()->link;
-
-                foreach ($products as $product) {
-                    $attributes = isset($product['attributes']) && !empty($product['attributes'])
-                        ? " (" . $product['attributes'] . ")"
-                        : "";
-                    $productName = $product['product_name'];
-                    $productPrice = $product['unit_price_tax_incl'];
-                    $formattedPrice = $this->formatPrice($productPrice, $currency->id);
-                    $productLink = $link->getProductLink($product['id_product']);
-                    $quantity = (int) $product['product_quantity'];
-
-                    $productslist .= "- <a href=\"$productLink\">$productName</a>$attributes" .
-                        " x " . $quantity .
-                        " (" . $formattedPrice . ")\n";
+            $getCurrency = function () use ($order) {
+                static $currency = null;
+                if ($currency === null) {
+                    $currency = new Currency($order->id_currency);
                 }
+                return $currency;
+            };
 
-                $placeholders['{products_list}'] = $productslist;
-            }
+            $getLink = function () {
+                static $link = null;
+                if ($link === null) {
+                    $link = Context::getContext()->link;
+                }
+                return $link;
+            };
 
-            if (strpos($newOrderTemplate, '{order_comment}') !== false) {
-                $orderMessage = '';
-                if ($order->id) {
-                    $orderMessages = Message::getMessagesByOrderId((int) $order->id);
-                    if (!empty($orderMessages)) {
-                        $orderMessage = $orderMessages[0]['message'];
+            $ipProvider = function () {
+                static $ip = null;
+                if ($ip === null) {
+                    $ip = Tools::getRemoteAddr();
+                }
+                return $ip;
+            };
+
+            $message = $this->fillTemplate($newOrderTemplate, [
+                '{order_reference}' => function () use ($order) {
+                    return $order->reference; },
+                '{shop_name}' => function () use ($order) {
+                    $shop = new Shop($order->id_shop);
+                    return $shop->name; },
+                '{customer_name}' => function () use ($getCustomer) {
+                    $c = $getCustomer();
+                    return $c->firstname . ' ' . $c->lastname; },
+                '{customer_email}' => function () use ($getCustomer) {
+                    return $getCustomer()->email; },
+                '{ip_address}' => function () use ($ipProvider) {
+                    return $ipProvider(); },
+                '{country}' => function () use ($ipProvider) {
+                    return $this->getCountryFromIP($ipProvider()); },
+                '{date_time}' => function () {
+                    return date('Y-m-d H:i:s'); },
+                '{phone_number}' => function () use ($getAddress) {
+                    $a = $getAddress();
+                    return !empty($a->phone_mobile) ? $a->phone_mobile : $a->phone;
+                },
+                '{total_paid}' => function () use ($order) {
+                    $totalPaid = $this->getOrderTotalPaid($order);
+                    return $this->formatPrice($totalPaid, $order->id_currency);
+                },
+                '{shipping_address}' => function () use ($getAddress) {
+                    return $this->formatShippingAddress($getAddress()); },
+                '{delivery_method}' => function () use ($order) {
+                    $carrier = new Carrier($order->id_carrier);
+                    return $carrier->name; },
+                '{payment_method}' => function () use ($order) {
+                    return $order->payment; },
+                '{products_list}' => function () use ($order, $getCurrency, $getLink) {
+                    $products = $order->getProducts();
+                    $currency = $getCurrency();
+                    $link = $getLink();
+                    $list = '';
+
+                    foreach ($products as $product) {
+                        $attributes = (isset($product['attributes']) && !empty($product['attributes'])) ? ' (' . $product['attributes'] . ')' : '';
+                        $productName = $product['product_name'];
+                        $productPrice = $product['unit_price_tax_incl'];
+                        $formattedPrice = $this->formatPrice($productPrice, $currency->id);
+                        $productLink = $link->getProductLink($product['id_product']);
+                        $quantity = (int) $product['product_quantity'];
+
+                        $list .= '- <a href="' . $productLink . '">' . $productName . '</a>' . $attributes .
+                            ' x ' . $quantity . ' (' . $formattedPrice . ')' . "\n";
                     }
-                }
-                $placeholders['{order_comment}'] = $orderMessage;
-            }
 
-            $message = strtr($newOrderTemplate, $placeholders);
+                    return $list;
+                },
+                '{order_comment}' => function () use ($order) {
+                    $orderMessage = '';
+                    if ($order->id) {
+                        $orderMessages = Message::getMessagesByOrderId((int) $order->id);
+                        if (!empty($orderMessages)) {
+                            $orderMessage = $orderMessages[0]['message'];
+                        }
+                    }
+                    return $orderMessage;
+                },
+            ]);
+
             $this->sendTelegramMessage($message, 'new_order');
         }
     }
@@ -900,6 +860,25 @@ class TelegramNotifier extends Module
             "🎂 Birthday: {birthday}\n" .
             "👫 Gender: {gender}\n" .
             "📰 Subscribed to newsletter: {newsletter}";
+    }
+
+    /**
+     * Fill a template using placeholder providers.
+     * Only computes values for placeholders actually present in the template.
+     */
+    private function fillTemplate($template, array $providers)
+    {
+        $replacements = [];
+
+        foreach ($providers as $placeholder => $provider) {
+            if (strpos($template, $placeholder) !== false) {
+                // Support callable providers or static values
+                $replacements[$placeholder] = is_callable($provider) ? (string) $provider() : (string) $provider;
+            }
+        }
+
+        // Replace collected placeholders; unknown placeholders remain intact by design.
+        return strtr($template, $replacements);
     }
 
     private function getCountryFromIP($ip)

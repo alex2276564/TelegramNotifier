@@ -17,6 +17,19 @@
 //    2. Adjust matchManagers in packageRules
 //    3. Customize project-specific ignore rules
 // ================================================================
+// ⚠️ SECURITY NOTE
+// -----------------
+// Regardless of which schedule mode you choose below (Option 1 / Option 2),
+// it's strongly recommended to run Renovate at least once per day
+// (via cron or CI).
+//
+// Reason:
+//   • vulnerabilityAlerts PRs ignore Renovate's "schedule" filter,
+//     but they are only created when the Renovate process actually runs.
+//   • If Renovate runs only once per week, security fixes (based on
+//     GitHub Dependabot alerts, OSV, etc.) can be delayed by up to a week.
+//   • For Internet‑facing or security‑sensitive projects, a daily
+//     Renovate run is a good baseline.
 
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
@@ -121,6 +134,29 @@
   // ================================================================
   // Best for: All repos update on same day, want to save resources
   //
+  // ⚠️  WARNING: Security trade-off
+  // ----------------------------------------------------------------
+  // This option runs Renovate less frequently (e.g., only on Mondays).
+  // While vulnerabilityAlerts bypass the schedule restriction, they
+  // can only be created when Renovate is actually running.
+  //
+  // Security implications:
+  //   • CVE published on Tuesday → not detected until next Monday
+  //   • Vulnerability window: up to 6-7 days
+  //   • Acceptable ONLY for:
+  //     - Internal/private applications (not internet-facing)
+  //     - Development/testing environments
+  //     - Applications where security is not critical
+  //
+  // ❌ DO NOT USE for:
+  //   • Public-facing web applications
+  //   • Production systems handling sensitive data
+  //   • Applications exposed to the internet
+  //   • Any security-critical infrastructure
+  //
+  // If security is important, use OPTION 1 (daily execution) instead.
+  // ----------------------------------------------------------------
+  //
   // Setup:
   // ------
   // VPS Cron (run Renovate only on Monday):
@@ -136,6 +172,7 @@
   // • Renovate runs:  1 time/week (cron: Monday only)
   // • PRs created:    1 time/week (schedule: always allowed)
   // • Wasted runs:    0/week (runs only when needed)
+  // • Security fixes: Delayed up to 6-7 days ⚠️
   //
   // ✅ Pros:
   //   • Efficient: No wasted Renovate executions
@@ -143,6 +180,7 @@
   //   • Resource-friendly: VPS not taxed on unused days
   //
   // ⚠️ Cons:
+  //   • Security risk: Vulnerabilities detected only once per week
   //   • Less flexible: All repos must use same day
   //     - If you want Repo B on Wednesday → must add second cron job
   //   • Portability: Moving to different CI requires cron reconfiguration
@@ -150,9 +188,8 @@
   //
   // 💡 TL;DR:
   // Control schedule entirely via cron, renovate.json has no day filter.
-  // More efficient but less portable. Requires cron changes if you
-  // want different schedules per repo or add new environments.
-  //
+  // More efficient but LESS SECURE. Only use for non-critical applications.
+  // For production systems, use OPTION 1 with daily cron execution.
   // ================================================================
   // 🎯 SCHEDULE SYNTAX REFERENCE
   // ================================================================
@@ -178,6 +215,45 @@
                       // Note: For day-only schedules like "on monday",
                       // timezone setting has minimal effect (day boundaries
                       // are fuzzy). Mainly matters for time-specific schedules.
+
+  // ================================================================
+  // 🔒 LOCK FILE MAINTENANCE
+  // ================================================================
+  // Periodic refresh of lock files without changing manifests.
+  //
+  // What it does:
+  //   • Deletes lock file(s) and regenerates them using the package manager
+  //   • Updates ALL transitive dependencies to the latest compatible versions
+  //   • Manifest files (build.gradle, package.json, etc.) remain unchanged
+  //   • Creates a dedicated PR that contains only lock file changes
+  //
+  // Safety notes:
+  //   • Lock file maintenance never goes beyond the version ranges
+  //     defined in your manifests.
+  //       Example:
+  //         "^1.2.3" → may update to the latest 1.x.x, but never to 2.x.x.
+  //   • Even though these PRs are not split by patch/minor/major,
+  //     major upgrades normally cannot happen until you relax the ranges
+  //     in the manifest itself.
+  //
+  // Scheduling:
+  //   • The top-level "schedule" (e.g. ["on monday"]) restricts ALL update
+  //     types (regular dependency updates, lock file maintenance, etc.),
+  //     so Renovate will create/update branches and PRs only when it matches.
+  //   • Here we set "schedule": ["at any time"] to override the local default
+  //     "before 4am on monday" and avoid conflicting schedules.
+  //     Effective behavior:
+  //       → lockFileMaintenance runs whenever the top-level schedule allows it.
+  //         (Global and local schedules are combined with AND conditions, not OR.)
+  // ================================================================
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": [
+      "at any time" // Make local schedule non-restrictive so only the global schedule matters (AND conditions, not OR).
+    ],
+    "automerge": true,
+    "commitMessagePrefix": "[Lockfile] "
+  },
 
   // ================================================================
   // 🎛️ RATE LIMITING
@@ -354,23 +430,6 @@
     },
 
     // ================================================================
-    // 🚨 SECURITY UPDATES
-    // ================================================================
-    // Vulnerability fixes bypass stabilization delay and auto-merge immediately
-    // ================================================================
-
-    {
-      "description": "🚨 Security: bypass minimumReleaseAge and auto-merge immediately",
-      "matchUpdateTypes": ["patch", "minor"],
-      "matchDatasources": ["*"],
-      // Override minimumReleaseAge for security fixes
-      "minimumReleaseAge": "0 days",
-      "automerge": true,
-      // Note: vulnerabilityAlerts.automerge (below) handles security updates,
-      // but this rule ensures patch/minor security fixes merge immediately
-    },
-
-    // ================================================================
     // 💬 COMMIT MESSAGE FORMATTING
     // ================================================================
     // Customize commit messages per package manager
@@ -403,24 +462,41 @@
       "semanticCommits": "disabled",
       // Example: "[GitHub Actions] Update actions/checkout action to v4.2.0"
     },
+
+    // ================================================================
+    // 🎯 PROJECT-SPECIFIC RULES
+    // ================================================================
+    // Custom policies for specific dependencies in this project
+    //
+    // 📝 These are project-specific examples. Customize or remove for your project:
+    //    - Ignore unstable/breaking dependencies
+    //    - Pin specific versions
+    //    - Group related updates
+    // ================================================================
+
   ],
 
   // ================================================================
   // 🔐 VULNERABILITY ALERTS
   // ================================================================
-  // GitHub/GitLab Security Advisories integration
-  // Auto-merge security fixes to minimize exposure window
+  // GitHub Security Advisories / Dependabot alerts integration.
+  // Renovate reads GitHub vulnerability alerts and raises dedicated
+  // security-fix PRs.
+  //
+  // Behavior:
+  //   • Ignores global limits like prConcurrentLimit, prHourlyLimit,
+  //     branchConcurrentLimit and schedule → "skip the line".
+  //   • PRs are created as soon as an alert is detected (prCreation: "immediate"),
+  //     this is prioritizing security over stability.
+  //   • With automerge: true + ignoreTests: true they are merged immediately.
   //
   // Sources:
-  // - GitHub Security Advisories
-  // - OSV Database (if osvVulnerabilityAlerts: true)
-  // - npm audit / Snyk / Dependabot (if enabled)
+  //   • GitHub Security Advisories / Dependabot alerts
+  //   • Optionally OSV, etc. (see osvVulnerabilityAlerts)
   // ================================================================
-
   "vulnerabilityAlerts": {
     "enabled": true,              // Enable security vulnerability detection
-    "automerge": true,            // Auto-merge security updates immediately
-                                  // Security updates bypass minimumReleaseAge and merge ASAP
-                                  // This prioritizes security over stability
+    "automerge": true,             // Auto-merge security fix PRs as soon as they appear
+    "labels": ["security", "priority-high"]
   }
 }

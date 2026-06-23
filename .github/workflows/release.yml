@@ -1,0 +1,392 @@
+name: Release PrestaShop module
+
+# =============================================================================
+# WORKFLOW CONFIG
+# -----------------------------------------------------------------------------
+# MODULE_NAME — human-readable module name used for artifacts & releases.
+# MODULE_SLUG — file/folder slug used for packaging.
+# MODULE_DIR  — directory name inside the release archive.
+# ZIP_NAME    — final distributable archive name.
+# =============================================================================
+env:
+  MODULE_NAME: TelegramNotifier
+  MODULE_SLUG: telegramnotifier
+  MODULE_DIR: telegramnotifier
+  ZIP_NAME: telegramnotifier.zip
+
+# =============================================================================
+# Security model for GitHub Actions: action versioning & runner egress
+#
+# RATIONALE
+# ---------
+# This is an open-source project maintained by a single developer.
+# Threat model (for CI / GitHub Actions specifically):
+# - Third-party GitHub Actions and build tools may eventually be compromised.
+# - There is no capacity to manually review SHA-pinned action diffs on every
+#   update.
+# - Therefore, the primary defence against malicious GitHub Actions is
+#   runtime monitoring and egress control on the runner, not version pinning.
+#
+# ACTION VERSIONING
+# -----------------
+# All third-party actions are referenced using @main / @master or the latest
+# convenient semver tag. We do NOT treat tag pinning as a strong security
+# control in this repository.
+#
+# SHA pinning is intentionally NOT used:
+# - It only provides strong guarantees when combined with manual review of
+#   every upstream commit, which this project cannot sustain.
+# - Without that review discipline, SHA pins can still point to malicious
+#   code that was present before the pin was taken, and they add maintenance
+#   overhead without realistic benefit here.
+#
+# Semver/tag pinning is also NOT enforced as a primary control:
+# - Tags on GitHub are mutable; recent supply-chain incidents (e.g. compromised
+#   actions overwriting historical tags) have shown that tag pinning alone does
+#   not reliably prevent malicious updates.
+#
+# Primary CI / GitHub Actions supply-chain controls:
+# - step-security/harden-runner is used in every job to protect the CI runner:
+#   * monitors outbound network, file, and process activity at runtime;
+#   * enforces a Global Block List of known-malicious endpoints maintained
+#     by StepSecurity's SOC;
+#   * supports per-job egress allowlists in block mode to limit exfiltration
+#     impact if an action or dependency is compromised.
+#
+# EGRESS POLICY (step-security/harden-runner)
+# ------------------------------------------
+# High-risk jobs (write permissions / secrets / CD & publishing):
+# - egress-policy: block with an explicit allowed-endpoints allowlist.
+#   Rationale: limits the blast radius if an action or dependency is
+#   compromised and tries to exfiltrate data.
+#
+# Low-risk jobs (read-only, no secrets):
+# - egress-policy: audit.
+#   Rationale: scanning tools may legitimately contact varying endpoints
+#   across versions; strict blocking would require frequent maintenance
+#   for little benefit when no sensitive credentials are present.
+#
+# See Harden-Runner docs:
+#   https://docs.stepsecurity.io/harden-runner
+# =============================================================================
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: "Release version (e.g. 1.0.9)"
+        required: true
+        type: string
+      release_notes:
+        description: "Release notes (markdown supported)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  # ================================================================
+  # 🏗️ BUILD: build ZIP and compute SHA-256
+  # ================================================================
+  build:
+    name: 🏗️ Build module
+    runs-on: ubuntu-latest
+
+    outputs:
+      zip_file: ${{ steps.zip.outputs.zip_file }}
+      zip_name: ${{ steps.zip.outputs.zip_name }}
+      sha256: ${{ steps.zip.outputs.sha256 }}
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@main
+        with:
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@main
+        with:
+          persist-credentials: false
+
+      - name: Check module version matches input (config.xml & PHP)
+        env:
+          RELEASE_VERSION: ${{ inputs.release_version }}
+        run: |
+          set -euo pipefail
+
+          if [ ! -f config.xml ]; then
+            echo "::error::config.xml not found in repository root"
+            exit 1
+          fi
+
+          if [ ! -f "${MODULE_SLUG}.php" ]; then
+            echo "::error::${MODULE_SLUG}.php not found in repository root"
+            exit 1
+          fi
+
+          # Extract version from <version>...</version> in config.xml
+          XML_VERSION=$(grep -E '<version>[^<]+</version>' config.xml \
+            | head -1 \
+            | sed -E 's/.*<version>([^<]+)<\/version>.*/\1/')
+
+          echo "Detected version from config.xml: $XML_VERSION"
+
+          if [ -z "$XML_VERSION" ]; then
+            echo "::error::Could not extract <version> from config.xml"
+            exit 1
+          fi
+
+          # Extract version from $this->version in the main PHP file
+          PHP_VERSION=$(grep -E '\$this->version\s*=\s*' "${MODULE_SLUG}.php" \
+            | head -1 \
+            | sed -E "s/.*\\\$this->version\s*=\s*'([^']+)'.*/\1/")
+
+          echo "Detected version from ${MODULE_SLUG}.php: $PHP_VERSION"
+
+          if [ -z "$PHP_VERSION" ]; then
+            echo "::error::Could not extract \$this->version from ${MODULE_SLUG}.php"
+            exit 1
+          fi
+
+          if [ "$XML_VERSION" != "$RELEASE_VERSION" ]; then
+            echo "::error::Version mismatch: config.xml=$XML_VERSION, input=$RELEASE_VERSION"
+            exit 1
+          fi
+
+          if [ "$PHP_VERSION" != "$RELEASE_VERSION" ]; then
+            echo "::error::Version mismatch: PHP=$PHP_VERSION, input=$RELEASE_VERSION"
+            exit 1
+          fi
+
+      - name: Create module directory
+        run: mkdir "${MODULE_DIR}"
+
+      - name: Move module files
+        run: |
+          set -euo pipefail
+          # Adjust this list if you add/remove files in the module root
+          mv LICENSE README.md "${MODULE_SLUG}.php" config.xml index.php logo.png "${MODULE_DIR}"
+
+      - name: Build release ZIP (reproducible)
+        run: |
+          set -euo pipefail
+
+          # Use the last commit timestamp as SOURCE_DATE_EPOCH for reproducible archives
+          SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+          export SOURCE_DATE_EPOCH
+
+          # Normalize timestamps for deterministic ZIP contents
+          find "${MODULE_DIR}" -exec touch -d "@$SOURCE_DATE_EPOCH" {} +
+
+          ZIP_FILE="${ZIP_NAME}"
+
+          # -X strips extra file attributes to improve reproducibility
+          zip -X -r "$ZIP_FILE" "${MODULE_DIR}"
+
+      - name: Locate ZIP and compute SHA-256
+        id: zip
+        run: |
+          set -euo pipefail
+
+          ZIP_FILE="${ZIP_NAME}"
+
+          if [ ! -f "$ZIP_FILE" ]; then
+            echo "::error::No ZIP found: $ZIP_FILE"
+            exit 1
+          fi
+
+          ZIP_NAME=$(basename "$ZIP_FILE")
+          SHA=$(sha256sum "$ZIP_FILE" | cut -d' ' -f1)
+
+          {
+            echo "zip_file=$ZIP_FILE"
+            echo "zip_name=$ZIP_NAME"
+            echo "sha256=$SHA"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Built ZIP: $ZIP_FILE"
+          echo "SHA-256 : $SHA"
+
+      - name: Upload ZIP as workflow artifact
+        uses: actions/upload-artifact@main
+        with:
+          name: module-zip
+          path: ${{ steps.zip.outputs.zip_file }}
+          retention-days: 3
+          if-no-files-found: error
+
+  # ================================================================
+  # 🔏 SLSA PROVENANCE (Generic SLSA3 generator)
+  #
+  # Hardening note:
+  # We cannot attach step-security/harden-runner to this job because it uses
+  # a reusable workflow via "uses:". GitHub does not allow injecting extra
+  # steps into a called reusable workflow, so any egress restrictions would
+  # need to be implemented in the upstream SLSA builder/generator workflow
+  # itself.
+  # ================================================================
+  provenance:
+    name: 🔏 SLSA Provenance (SLSA3)
+    needs: build
+
+    permissions:
+      actions: read
+      id-token: write # required for Sigstore/OIDC signing
+      contents: write # required to upload provenance as artifact
+
+    # SLSA generic generator: MUST be pinned to exact semver tag (vX.Y.Z)
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
+    with:
+      # Path to the artifact to attest, relative to the repository root.
+      # This path must match the ZIP produced in the build job.
+      subject-path: ${{ needs.build.outputs.zip_file }}
+
+      # Repo is public, so we explicitly allow logging to public Rekor
+      rekor-log-public: true
+
+  # ================================================================
+  # 🚀 GITHUB RELEASE
+  # ================================================================
+  release:
+    name: 🚀 GitHub Release
+    needs: [build, provenance]
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@main
+        with:
+          egress-policy: audit
+
+      - name: Download module ZIP
+        uses: actions/download-artifact@main
+        with:
+          name: module-zip
+          path: dist
+
+      - name: Download SLSA attestations artifact
+        uses: actions/download-artifact@main
+        with:
+          # The artifact name varies, but always ends with “-slsa-attestations”
+          pattern: "*-slsa-attestations"
+          path: slsa
+          merge-multiple: true
+
+      - name: Extract SLSA provenance file
+        shell: bash
+        env:
+          ZIP_NAME: ${{ needs.build.outputs.zip_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+
+          # Unzip all .tgz files that may have arrived
+          shopt -s nullglob
+          for tgz in slsa/**/*.tgz slsa/*.tgz; do
+            echo "Unpacking $tgz"
+            tar -xzf "$tgz" -C slsa
+          done
+
+          # Find a .slsa file
+          SLSA_FILE=$(find slsa -type f -name '*.slsa' | head -1)
+          if [ -z "$SLSA_FILE" ]; then
+            echo "::error::No .slsa provenance file found in SLSA artifact"
+            find slsa -maxdepth 3 -type f || true
+            exit 1
+          fi
+
+          # Copy it next to the ZIP file and give it a descriptive name
+          cp -- "$SLSA_FILE" "dist/${ZIP_NAME}.build.slsa"
+          echo "Provenance copied to dist/${ZIP_NAME}.build.slsa"
+
+          echo "=== dist contents ==="
+          ls -R dist
+
+      - name: Create GitHub Release
+        # zizmor: softprops/action-gh-release is intentionally used over
+        # `gh release` CLI — it provides atomic asset upload, glob support,
+        # and release update semantics not easily replicated with the CLI.
+        uses: softprops/action-gh-release@main # zizmor: ignore[superfluous-actions]
+        with:
+          # No automatic "v" prefix: the tag will be exactly what you type
+          # in the "release_version" input (e.g. "1.0.9").
+          tag_name: ${{ inputs.release_version }}
+          name: ${{ env.MODULE_NAME }} ${{ inputs.release_version }}
+          body: |
+            ${{ inputs.release_notes }}
+
+            ---
+
+            <details>
+            <summary><strong>Click to view how to verify this build (checksums & SLSA)</strong></summary>
+
+            ### 1. Verify SHA-256 checksum
+
+            After downloading the ZIP from this release, run:
+
+            **Linux / macOS:**
+            ```bash
+            sha256sum ${{ needs.build.outputs.zip_name }}
+            ```
+
+            **Windows (PowerShell):**
+            ```powershell
+            Get-FileHash ${{ needs.build.outputs.zip_name }} -Algorithm SHA256
+            ```
+
+            Expected output:
+
+            ```text
+            ${{ needs.build.outputs.sha256 }}  ${{ needs.build.outputs.zip_name }}
+            ```
+
+            If the checksum does not match, **do not use this ZIP** and please
+            open an issue: https://github.com/${{ github.repository }}/issues
+
+            ---
+
+            ### 2. Verify SLSA provenance (supply-chain integrity)
+
+            This project publishes SLSA Build Level 3 provenance for the ZIP.
+            Advanced users can verify that the ZIP was built by this repository's
+            GitHub Actions workflow without tampering.
+
+            #### 2.1. Download both:
+               - `${{ needs.build.outputs.zip_name }}`
+               - `${{ needs.build.outputs.zip_name }}.build.slsa`
+
+            #### 2.2. Install \`slsa-verifier\`
+
+            Option A — via Go:
+
+            ```bash
+            go install github.com/slsa-framework/slsa-verifier/v2/cmd/slsa-verifier@latest
+            ```
+
+            Option B — prebuilt binaries:
+
+            1. Go to: https://github.com/slsa-framework/slsa-verifier/releases/latest
+            2. Download the binary for your OS
+            3. Put it into your \$PATH and make it executable
+
+            #### 2.3. Run:
+
+            ```bash
+            slsa-verifier verify-artifact \
+              ${{ needs.build.outputs.zip_name }} \
+              --provenance-path ${{ needs.build.outputs.zip_name }}.build.slsa \
+              --source-uri github.com/${{ github.repository }}
+            ```
+
+            If verification fails, **do not trust this file** and open an issue:
+            https://github.com/${{ github.repository }}/issues
+
+            </details>
+          files: |
+            dist/${{ needs.build.outputs.zip_name }}
+            dist/${{ needs.build.outputs.zip_name }}.build.slsa
+          fail_on_unmatched_files: true

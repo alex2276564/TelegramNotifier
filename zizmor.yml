@@ -1,0 +1,20 @@
+rules:
+  # unpinned-uses is intentionally disabled.
+  #
+  # This project does not use SHA pinning or enforced semver pinning for
+  # GitHub Actions. See the security model comment at the top of each
+  # workflow file for the full rationale. In short:
+  #
+  # - SHA pinning is only meaningful when paired with manual diff review
+  #   of every upstream commit, which a single-developer project cannot
+  #   sustain. Without that review, SHA pins add complexity but do not
+  #   reliably prevent malicious code execution.
+  # - Tag pinning does not prevent tag-overwrite attacks (tags are mutable
+  #   on GitHub; recent incidents have shown historical tags being
+  #   overwritten to point to malicious commits).
+  # - CI / GitHub Actions supply-chain protection is delegated primarily
+  #   to step-security/harden-runner, which is designed to detect and limit
+  #   suspicious or malicious behaviour at runtime (network/file/process
+  #   activity) regardless of the action ref format used.
+  unpinned-uses:
+    disable: true

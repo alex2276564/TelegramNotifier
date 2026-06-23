@@ -1,0 +1,354 @@
+name: Lint and Build PrestaShop module
+
+# =============================================================================
+# WORKFLOW CONFIG
+# -----------------------------------------------------------------------------
+# MODULE_NAME — human-readable module name used for artifacts & releases.
+# MODULE_SLUG — file/folder slug used for packaging.
+# MODULE_DIR  — directory name inside the release archive.
+# ZIP_NAME    — final distributable archive name.
+# =============================================================================
+env:
+  MODULE_NAME: TelegramNotifier
+  MODULE_SLUG: telegramnotifier
+  MODULE_DIR: telegramnotifier
+  ZIP_NAME: telegramnotifier.zip
+
+# =============================================================================
+# Security model for GitHub Actions: action versioning & runner egress
+#
+# RATIONALE
+# ---------
+# This is an open-source project maintained by a single developer.
+# Threat model (for CI / GitHub Actions specifically):
+# - Third-party GitHub Actions and build tools may eventually be compromised.
+# - There is no capacity to manually review SHA-pinned action diffs on every
+#   update.
+# - Therefore, the primary defence against malicious GitHub Actions is
+#   runtime monitoring and egress control on the runner, not version pinning.
+#
+# ACTION VERSIONING
+# -----------------
+# All third-party actions are referenced using @main / @master or the latest
+# convenient semver tag. We do NOT treat tag pinning as a strong security
+# control in this repository.
+#
+# SHA pinning is intentionally NOT used:
+# - It only provides strong guarantees when combined with manual review of
+#   every upstream commit, which this project cannot sustain.
+# - Without that review discipline, SHA pins can still point to malicious
+#   code that was present before the pin was taken, and they add maintenance
+#   overhead without realistic benefit here.
+#
+# Semver/tag pinning is also NOT enforced as a primary control:
+# - Tags on GitHub are mutable; recent supply-chain incidents (e.g. compromised
+#   actions overwriting historical tags) have shown that tag pinning alone does
+#   not reliably prevent malicious updates.
+#
+# Primary CI / GitHub Actions supply-chain controls:
+# - step-security/harden-runner is used in every job to protect the CI runner:
+#   * monitors outbound network, file, and process activity at runtime;
+#   * enforces a Global Block List of known-malicious endpoints maintained
+#     by StepSecurity's SOC;
+#   * supports per-job egress allowlists in block mode to limit exfiltration
+#     impact if an action or dependency is compromised.
+#
+# EGRESS POLICY (step-security/harden-runner)
+# ------------------------------------------
+# High-risk jobs (write permissions / secrets / CD & publishing):
+# - egress-policy: block with an explicit allowed-endpoints allowlist.
+#   Rationale: limits the blast radius if an action or dependency is
+#   compromised and tries to exfiltrate data.
+#
+# Low-risk jobs (read-only, no secrets):
+# - egress-policy: audit.
+#   Rationale: scanning tools may legitimately contact varying endpoints
+#   across versions; strict blocking would require frequent maintenance
+#   for little benefit when no sensitive credentials are present.
+#
+# See Harden-Runner docs:
+#   https://docs.stepsecurity.io/harden-runner
+# =============================================================================
+
+on:
+  push:
+    branches: [main]
+
+  pull_request:
+    branches: ["**"]
+
+permissions:
+  contents: read
+
+jobs:
+  lint-actions:
+    name: 🧹 Lint Actions
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@main
+        with:
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@main
+        with:
+          persist-credentials: false
+
+      - name: Actionlint (Reviewdog)
+        uses: step-security/action-actionlint@main
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: ${{ github.event_name == 'pull_request' && 'github-pr-review' || 'github-check' }}
+
+  lint-renovate:
+    name: 🧹 Lint Renovate
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@main
+        with:
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@main
+        with:
+          persist-credentials: false
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@main
+        with:
+          bun-version: latest
+
+      - name: Setup Socket Firewall
+        uses: socketdev/action@main
+        with:
+          mode: firewall-free
+
+      - name: Validate Renovate Config via Socket Firewall
+        run: |
+          sfw bunx --package renovate renovate-config-validator --strict
+
+  lint-php:
+    name: 🧹 Lint PHP (${{ matrix.php-label }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - php-version: '7.2'
+            php-label: '7.2 (minimum)'
+          - php-version: 'latest'
+            php-label: 'latest (maximum)'
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@main
+        with:
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@main
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP ${{ matrix.php-version }}
+        uses: shivammathur/setup-php@main
+        with:
+          php-version: ${{ matrix.php-version }}
+          coverage: none
+
+      - name: Show PHP version
+        run: php -v
+
+      - name: PHP Syntax Check
+        run: find . -name "*.php" -print0 | xargs -0 -n1 php -l
+
+  lint-links:
+    name: 🧹 Lint Links
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@main
+        with:
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@main
+        with:
+          persist-credentials: false
+
+      - name: Lint Links
+        uses: umbrelladocs/action-linkspector@main
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: ${{ github.event_name == 'pull_request' && 'github-pr-review' || 'github-check' }}
+          fail_level: error
+
+  lint-markdown:
+    name: 🧹 Lint Markdown
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@main
+        with:
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@main
+        with:
+          persist-credentials: false
+
+      - name: Lint Markdown files
+        uses: DavidAnson/markdownlint-cli2-action@main
+        with:
+          globs: "**/*.md"
+          config: ".markdownlint.jsonc"
+
+  security-scan-semgrep:
+    name: 🔐 Security Scan Semgrep
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      security-events: write
+
+    env:
+      SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@main
+        with:
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@main
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@main
+        with:
+          python-version: "3.x"
+
+      - name: Setup Socket Firewall
+        uses: socketdev/action@main
+        with:
+          mode: firewall-free
+
+      - name: Install Semgrep via Socket Firewall
+        run: sfw pip install semgrep
+
+      - name: Setup Semgrep Pro Engine via Socket Firewall
+        run: sfw semgrep install-semgrep-pro
+
+      - name: Run Semgrep
+        run: |
+          semgrep scan \
+            --pro \
+            --config auto \
+            --config "p/owasp-top-ten" \
+            --config "p/secrets" \
+            --config "p/github-actions" \
+            --config "p/supply-chain" \
+            --sarif --output semgrep.sarif \
+            --error
+
+      - name: Upload results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: semgrep.sarif
+
+  secrets-scan-trufflehog:
+    name: 🔑 Secrets Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@main
+        with:
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@main
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # Required for diff scan
+
+      - name: TruffleHog Secrets Scan (full)
+        if: github.event_name != 'pull_request'
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          extra_args: --results=verified,unknown
+
+      - name: TruffleHog Secrets Scan (diff)
+        if: github.event_name == 'pull_request'
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.pull_request.base.sha }}
+          head: ${{ github.event.pull_request.head.sha }}
+          extra_args: --results=verified,unknown
+
+  build:
+    name: 🏗️ Build Module
+    needs:
+      [
+        lint-actions,
+        lint-renovate,
+        lint-php,
+        lint-links,
+        lint-markdown,
+        security-scan-semgrep,
+        secrets-scan-trufflehog,
+      ]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@main
+        with:
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@main
+        with:
+          persist-credentials: false
+
+      - name: Create module directory
+        run: mkdir "${MODULE_DIR}"
+
+      - name: Move module files
+        run: |
+          set -euo pipefail
+          mv LICENSE README.md "${MODULE_SLUG}.php" config.xml index.php logo.png "${MODULE_DIR}"
+
+      - name: Create ZIP archive
+        run: zip -r "${ZIP_NAME}" "${MODULE_DIR}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@main
+        with:
+          name: ${{ env.MODULE_NAME }}
+          path: ${{ env.ZIP_NAME }}

@@ -1,0 +1,104 @@
+name: OpenSSF Scorecard
+
+# =============================================================================
+# Security model for GitHub Actions: action versioning & runner egress
+#
+# RATIONALE
+# ---------
+# This is an open-source project maintained by a single developer.
+# Threat model (for CI / GitHub Actions specifically):
+# - Third-party GitHub Actions and build tools may eventually be compromised.
+# - There is no capacity to manually review SHA-pinned action diffs on every
+#   update.
+# - Therefore, the primary defence against malicious GitHub Actions is
+#   runtime monitoring and egress control on the runner, not version pinning.
+#
+# ACTION VERSIONING
+# -----------------
+# All third-party actions are referenced using @main / @master or the latest
+# convenient semver tag. We do NOT treat tag pinning as a strong security
+# control in this repository.
+#
+# SHA pinning is intentionally NOT used:
+# - It only provides strong guarantees when combined with manual review of
+#   every upstream commit, which this project cannot sustain.
+# - Without that review discipline, SHA pins can still point to malicious
+#   code that was present before the pin was taken, and they add maintenance
+#   overhead without realistic benefit here.
+#
+# Semver/tag pinning is also NOT enforced as a primary control:
+# - Tags on GitHub are mutable; recent supply-chain incidents (e.g. compromised
+#   actions overwriting historical tags) have shown that tag pinning alone does
+#   not reliably prevent malicious updates.
+#
+# Primary CI / GitHub Actions supply-chain controls:
+# - step-security/harden-runner is used in every job to protect the CI runner:
+#   * monitors outbound network, file, and process activity at runtime;
+#   * enforces a Global Block List of known-malicious endpoints maintained
+#     by StepSecurity's SOC;
+#   * supports per-job egress allowlists in block mode to limit exfiltration
+#     impact if an action or dependency is compromised.
+#
+# EGRESS POLICY (step-security/harden-runner)
+# ------------------------------------------
+# High-risk jobs (write permissions / secrets / CD & publishing):
+# - egress-policy: block with an explicit allowed-endpoints allowlist.
+#   Rationale: limits the blast radius if an action or dependency is
+#   compromised and tries to exfiltrate data.
+#
+# Low-risk jobs (read-only, no secrets):
+# - egress-policy: audit.
+#   Rationale: scanning tools may legitimately contact varying endpoints
+#   across versions; strict blocking would require frequent maintenance
+#   for little benefit when no sensitive credentials are present.
+#
+# See Harden-Runner docs:
+#   https://docs.stepsecurity.io/harden-runner
+# =============================================================================
+
+on:
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analysis:
+    name: 📊 OpenSSF Scorecard Analysis
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@main
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            api.deps.dev:443
+            api.github.com:443
+            api.osv.dev:443
+            github.com:443
+            oss-fuzz-build-logs.storage.googleapis.com:443
+            www.bestpractices.dev:443
+
+      - name: Checkout repository
+        uses: actions/checkout@main
+        with:
+          persist-credentials: false
+
+      - name: Run Scorecard analysis
+        uses: ossf/scorecard-action@main
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: false
+
+      - name: Upload Scorecard results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: results.sarif

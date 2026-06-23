@@ -138,9 +138,9 @@ jobs:
           fi
 
           # Extract version from $this->version in the main PHP file
-          PHP_VERSION=$(grep -E '\$this->version\s*=\s*' "${MODULE_SLUG}.php" \
+          PHP_VERSION=$(grep -E "\\\$this->version\\s*=\\s*" "${MODULE_SLUG}.php" \
             | head -1 \
-            | sed -E "s/.*\\\$this->version\s*=\s*'([^']+)'.*/\1/")
+            | sed -E "s/.*\\\$this->version\\s*=\\s*'([^']+)'.*/\1/")
 
           echo "Detected version from ${MODULE_SLUG}.php: $PHP_VERSION"
 

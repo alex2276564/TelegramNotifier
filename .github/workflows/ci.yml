@@ -108,6 +108,7 @@ jobs:
           reporter: ${{ github.event_name == 'pull_request' && 'github-pr-review' || 'github-check' }}
           fail_on_error: true
           level: any
+          filter_mode: nofilter
 
 
   lint-renovate:

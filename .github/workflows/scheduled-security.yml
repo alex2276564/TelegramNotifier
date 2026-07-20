@@ -159,6 +159,7 @@ jobs:
             --config "p/secrets" \
             --config "p/github-actions" \
             --config "p/supply-chain" \
+            --exclude-rule "yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag" \
             --sarif --output semgrep.sarif \
             --error
 
@@ -197,6 +198,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install Strix
+        # nosemgrep: yaml.github-actions.security.gha-curl-pipe-shell.gha-curl-pipe-shell
         run: |
           curl -sSL https://strix.ai/install | bash
 

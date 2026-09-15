@@ -710,20 +710,42 @@ class TelegramNotifier extends Module
                 curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postData));
             }
 
-            $result = curl_exec($ch);
+            $buffer = '';
+            $bodyTooLarge = false;
+            $maxBytes = 262144; // 256 KiB
+
+            curl_setopt($ch, CURLOPT_WRITEFUNCTION, function ($_ch, $chunk) use (&$buffer, &$bodyTooLarge, $maxBytes) {
+                $length = strlen($chunk);
+                if (strlen($buffer) + $length > $maxBytes) {
+                    $bodyTooLarge = true;
+                    // Returning 0 aborts the transfer with a write error.
+                    return 0;
+                }
+                $buffer .= $chunk;
+                return $length;
+            });
+
+            $success = curl_exec($ch);
             $error = curl_error($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
 
+            if ($bodyTooLarge && $error === '') {
+                $error = 'HTTP response too large';
+            }
+
             return [
-                'result' => $result,
+                'result' => ($success && !$bodyTooLarge && $error === '') ? $buffer : '',
                 'error' => $error,
-                'httpCode' => $httpCode
+                'httpCode' => $httpCode,
             ];
         }
 
+        // Multi-request branch
         $mh = curl_multi_init();
         $curlHandles = [];
+        $bodies = [];
+        $tooLarge = [];
 
         foreach ($urls as $index => $url) {
             $ch = curl_init();
@@ -742,8 +764,22 @@ class TelegramNotifier extends Module
                 curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postData[$index]));
             }
 
+            $bodies[$index] = '';
+            $tooLarge[$index] = false;
+            $maxBytes = 262144; // 256 KiB
+
+            curl_setopt($ch, CURLOPT_WRITEFUNCTION, function ($_ch, $chunk) use (&$bodies, &$tooLarge, $index, $maxBytes) {
+                $length = strlen($chunk);
+                if (strlen($bodies[$index]) + $length > $maxBytes) {
+                    $tooLarge[$index] = true;
+                    return 0;
+                }
+                $bodies[$index] .= $chunk;
+                return $length;
+            });
+
             curl_multi_add_handle($mh, $ch);
-            $curlHandles[] = $ch;
+            $curlHandles[$index] = $ch;
         }
 
         $running = null;
@@ -755,12 +791,20 @@ class TelegramNotifier extends Module
         } while ($running > 0 && $status == CURLM_OK);
 
         $results = [];
-        foreach ($curlHandles as $ch) {
+        foreach ($curlHandles as $index => $ch) {
+            $error = curl_error($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+            if ($tooLarge[$index] && $error === '') {
+                $error = 'HTTP response too large';
+            }
+
             $results[] = [
-                'result' => curl_multi_getcontent($ch),
-                'error' => curl_error($ch),
-                'httpCode' => curl_getinfo($ch, CURLINFO_HTTP_CODE)
+                'result' => ($error === '' && !$tooLarge[$index]) ? $bodies[$index] : '',
+                'error' => $error,
+                'httpCode' => $httpCode,
             ];
+
             curl_multi_remove_handle($mh, $ch);
         }
 

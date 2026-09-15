@@ -5,27 +5,42 @@ if (!defined('_PS_VERSION_')) {
 
 class TelegramNotifier extends Module
 {
+    // Configuration keys
+    private const CFG_BOT_TOKEN = 'TELEGRAMNOTIFY_BOT_TOKEN';
+    private const CFG_NEW_ORDERS_CHAT_ID = 'TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID';
+    private const CFG_ADMIN_LOGIN_CHAT_ID = 'TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID';
+    private const CFG_NEW_CUSTOMER_CHAT_ID = 'TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID';
+    private const CFG_UPDATE_NOTIFICATIONS = 'TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS';
+    private const CFG_UPDATE_CHECK_INTERVAL = 'TELEGRAMNOTIFY_UPDATE_CHECK_INTERVAL';
+    private const CFG_MAX_MESSAGES = 'TELEGRAMNOTIFY_MAX_MESSAGES';
+    private const CFG_MAX_RETRIES = 'TELEGRAMNOTIFY_MAX_RETRIES';
+    private const CFG_NEW_ORDER_TEMPLATE = 'TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE';
+    private const CFG_ADMIN_LOGIN_TEMPLATE = 'TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE';
+    private const CFG_NEW_CUSTOMER_TEMPLATE = 'TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE';
+    private const CFG_LAST_UPDATE_CHECK = 'TELEGRAMNOTIFY_LAST_UPDATE_CHECK';
+    private const CFG_CACHED_VERSION = 'TELEGRAMNOTIFY_CACHED_VERSION';
+
     private $configCache = [];
 
     private function getConfigSchema()
     {
         return [
-            'TELEGRAMNOTIFY_BOT_TOKEN' => ['type' => 'string', 'default' => ''],
-            'TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID' => ['type' => 'string', 'default' => ''],
-            'TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID' => ['type' => 'string', 'default' => ''],
-            'TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID' => ['type' => 'string', 'default' => ''],
+            self::CFG_BOT_TOKEN => ['type' => 'string', 'default' => ''],
+            self::CFG_NEW_ORDERS_CHAT_ID => ['type' => 'string', 'default' => ''],
+            self::CFG_ADMIN_LOGIN_CHAT_ID => ['type' => 'string', 'default' => ''],
+            self::CFG_NEW_CUSTOMER_CHAT_ID => ['type' => 'string', 'default' => ''],
 
-            'TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS' => ['type' => 'bool', 'default' => true],
-            'TELEGRAMNOTIFY_UPDATE_CHECK_INTERVAL' => ['type' => 'int', 'default' => 12], // hours
-            'TELEGRAMNOTIFY_MAX_MESSAGES' => ['type' => 'int', 'default' => 5],
-            'TELEGRAMNOTIFY_MAX_RETRIES' => ['type' => 'int', 'default' => 0],
+            self::CFG_UPDATE_NOTIFICATIONS => ['type' => 'bool', 'default' => true],
+            self::CFG_UPDATE_CHECK_INTERVAL => ['type' => 'int', 'default' => 12], // hours
+            self::CFG_MAX_MESSAGES => ['type' => 'int', 'default' => 5],
+            self::CFG_MAX_RETRIES => ['type' => 'int', 'default' => 0],
 
-            'TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE' => ['type' => 'string', 'default' => $this->getDefaultNewOrderTemplate()],
-            'TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE' => ['type' => 'string', 'default' => $this->getDefaultAdminLoginTemplate()],
-            'TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE' => ['type' => 'string', 'default' => $this->getDefaultNewCustomerTemplate()],
+            self::CFG_NEW_ORDER_TEMPLATE => ['type' => 'string', 'default' => $this->getDefaultNewOrderTemplate()],
+            self::CFG_ADMIN_LOGIN_TEMPLATE => ['type' => 'string', 'default' => $this->getDefaultAdminLoginTemplate()],
+            self::CFG_NEW_CUSTOMER_TEMPLATE => ['type' => 'string', 'default' => $this->getDefaultNewCustomerTemplate()],
 
-            'TELEGRAMNOTIFY_LAST_UPDATE_CHECK' => ['type' => 'int', 'default' => 0],
-            'TELEGRAMNOTIFY_CACHED_VERSION' => ['type' => 'string', 'default' => ''],
+            self::CFG_LAST_UPDATE_CHECK => ['type' => 'int', 'default' => 0],
+            self::CFG_CACHED_VERSION => ['type' => 'string', 'default' => ''],
         ];
     }
 
@@ -152,44 +167,44 @@ class TelegramNotifier extends Module
         }
 
         return $installResult &&
-            $this->setConfigValue('TELEGRAMNOTIFY_BOT_TOKEN', '') &&
-            $this->setConfigValue('TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID', '') &&
-            $this->setConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID', '') &&
-            $this->setConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID', '') &&
-            $this->setConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS', true) &&
-            $this->setConfigValue('TELEGRAMNOTIFY_UPDATE_CHECK_INTERVAL', 12) &&
-            $this->setConfigValue('TELEGRAMNOTIFY_MAX_MESSAGES', 5) &&
-            $this->setConfigValue('TELEGRAMNOTIFY_MAX_RETRIES', 0) &&
-            $this->setConfigValue('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE', $this->getDefaultNewOrderTemplate()) &&
-            $this->setConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE', $this->getDefaultAdminLoginTemplate()) &&
-            $this->setConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE', $this->getDefaultNewCustomerTemplate()) &&
-            $this->setConfigValue('TELEGRAMNOTIFY_LAST_UPDATE_CHECK', 0) &&
-            $this->setConfigValue('TELEGRAMNOTIFY_CACHED_VERSION', '');
+            $this->setConfigValue(self::CFG_BOT_TOKEN, '') &&
+            $this->setConfigValue(self::CFG_NEW_ORDERS_CHAT_ID, '') &&
+            $this->setConfigValue(self::CFG_ADMIN_LOGIN_CHAT_ID, '') &&
+            $this->setConfigValue(self::CFG_NEW_CUSTOMER_CHAT_ID, '') &&
+            $this->setConfigValue(self::CFG_UPDATE_NOTIFICATIONS, true) &&
+            $this->setConfigValue(self::CFG_UPDATE_CHECK_INTERVAL, 12) &&
+            $this->setConfigValue(self::CFG_MAX_MESSAGES, 5) &&
+            $this->setConfigValue(self::CFG_MAX_RETRIES, 0) &&
+            $this->setConfigValue(self::CFG_NEW_ORDER_TEMPLATE, $this->getDefaultNewOrderTemplate()) &&
+            $this->setConfigValue(self::CFG_ADMIN_LOGIN_TEMPLATE, $this->getDefaultAdminLoginTemplate()) &&
+            $this->setConfigValue(self::CFG_NEW_CUSTOMER_TEMPLATE, $this->getDefaultNewCustomerTemplate()) &&
+            $this->setConfigValue(self::CFG_LAST_UPDATE_CHECK, 0) &&
+            $this->setConfigValue(self::CFG_CACHED_VERSION, '');
     }
 
     public function uninstall()
     {
         return parent::uninstall() &&
-            $this->deleteConfigValue('TELEGRAMNOTIFY_BOT_TOKEN') &&
-            $this->deleteConfigValue('TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID') &&
-            $this->deleteConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID') &&
-            $this->deleteConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID') &&
-            $this->deleteConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS') &&
-            $this->deleteConfigValue('TELEGRAMNOTIFY_UPDATE_CHECK_INTERVAL') &&
-            $this->deleteConfigValue('TELEGRAMNOTIFY_MAX_MESSAGES') &&
-            $this->deleteConfigValue('TELEGRAMNOTIFY_MAX_RETRIES') &&
-            $this->deleteConfigValue('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE') &&
-            $this->deleteConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE') &&
-            $this->deleteConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE') &&
-            $this->deleteConfigValue('TELEGRAMNOTIFY_LAST_UPDATE_CHECK') &&
-            $this->deleteConfigValue('TELEGRAMNOTIFY_CACHED_VERSION');
+            $this->deleteConfigValue(self::CFG_BOT_TOKEN) &&
+            $this->deleteConfigValue(self::CFG_NEW_ORDERS_CHAT_ID) &&
+            $this->deleteConfigValue(self::CFG_ADMIN_LOGIN_CHAT_ID) &&
+            $this->deleteConfigValue(self::CFG_NEW_CUSTOMER_CHAT_ID) &&
+            $this->deleteConfigValue(self::CFG_UPDATE_NOTIFICATIONS) &&
+            $this->deleteConfigValue(self::CFG_UPDATE_CHECK_INTERVAL) &&
+            $this->deleteConfigValue(self::CFG_MAX_MESSAGES) &&
+            $this->deleteConfigValue(self::CFG_MAX_RETRIES) &&
+            $this->deleteConfigValue(self::CFG_NEW_ORDER_TEMPLATE) &&
+            $this->deleteConfigValue(self::CFG_ADMIN_LOGIN_TEMPLATE) &&
+            $this->deleteConfigValue(self::CFG_NEW_CUSTOMER_TEMPLATE) &&
+            $this->deleteConfigValue(self::CFG_LAST_UPDATE_CHECK) &&
+            $this->deleteConfigValue(self::CFG_CACHED_VERSION);
     }
 
     public function hookActionCustomerAccountAdd($params)
     {
-        if (!empty($this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID'))) {
+        if (!empty($this->getFromCache(self::CFG_NEW_CUSTOMER_CHAT_ID))) {
             $customer = $params['newCustomer'];
-            $newCustomerTemplate = $this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE');
+            $newCustomerTemplate = $this->getFromCache(self::CFG_NEW_CUSTOMER_TEMPLATE);
 
             $placeholders = [
                 '{customer_name}' => '',
@@ -247,9 +262,9 @@ class TelegramNotifier extends Module
 
     public function hookActionAdminLoginControllerLoginAfter($params)
     {
-        if (!empty($this->getFromCache('TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID'))) {
+        if (!empty($this->getFromCache(self::CFG_ADMIN_LOGIN_CHAT_ID))) {
             $employee = $params['employee'];
-            $adminLoginTemplate = $this->getFromCache('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE');
+            $adminLoginTemplate = $this->getFromCache(self::CFG_ADMIN_LOGIN_TEMPLATE);
 
             $placeholders = [
                 '{employee_name}' => '',
@@ -291,12 +306,12 @@ class TelegramNotifier extends Module
 
     public function hookActionValidateOrder($params)
     {
-        if (!empty($this->getFromCache('TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID'))) {
+        if (!empty($this->getFromCache(self::CFG_NEW_ORDERS_CHAT_ID))) {
             $order = $params['order'];
             $customer = new Customer($order->id_customer);
             $address = new Address($order->id_address_delivery);
 
-            $newOrderTemplate = $this->getFromCache('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE');
+            $newOrderTemplate = $this->getFromCache(self::CFG_NEW_ORDER_TEMPLATE);
 
             $placeholders = [
                 '{order_reference}' => '',
@@ -413,41 +428,41 @@ class TelegramNotifier extends Module
 
     private function sendTelegramMessage($message, $notificationType)
     {
-        $botToken = $this->getFromCache('TELEGRAMNOTIFY_BOT_TOKEN');
-        $maxRetries = (int) $this->getFromCache('TELEGRAMNOTIFY_MAX_RETRIES');
+        $botToken = $this->getFromCache(self::CFG_BOT_TOKEN);
+        $maxRetries = (int) $this->getFromCache(self::CFG_MAX_RETRIES);
 
         switch ($notificationType) {
             case 'new_order':
-                $chatIds = $this->getFromCache('TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID');
+                $chatIds = $this->getFromCache(self::CFG_NEW_ORDERS_CHAT_ID);
                 break;
             case 'admin_login':
-                $chatIds = $this->getFromCache('TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID');
+                $chatIds = $this->getFromCache(self::CFG_ADMIN_LOGIN_CHAT_ID);
                 break;
             case 'new_customer':
-                $chatIds = $this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID');
+                $chatIds = $this->getFromCache(self::CFG_NEW_CUSTOMER_CHAT_ID);
                 break;
             case 'test':
-                $chatIds = $this->getFromCache('TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID');
+                $chatIds = $this->getFromCache(self::CFG_NEW_ORDERS_CHAT_ID);
                 break;
             default:
                 $this->logError('Invalid notification type: ' . $notificationType);
                 return false;
         }
 
-        $maxMessages = $this->getFromCache('TELEGRAMNOTIFY_MAX_MESSAGES');
+        $maxMessages = $this->getFromCache(self::CFG_MAX_MESSAGES);
 
         $validate = $this->validateConfigurationData(
             $botToken,
-            $this->getFromCache('TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID'),
-            $this->getFromCache('TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID'),
-            $this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID'),
-            $this->getFromCache('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS'),
-            $this->getFromCache('TELEGRAMNOTIFY_UPDATE_CHECK_INTERVAL'),
+            $this->getFromCache(self::CFG_NEW_ORDERS_CHAT_ID),
+            $this->getFromCache(self::CFG_ADMIN_LOGIN_CHAT_ID),
+            $this->getFromCache(self::CFG_NEW_CUSTOMER_CHAT_ID),
+            $this->getFromCache(self::CFG_UPDATE_NOTIFICATIONS),
+            $this->getFromCache(self::CFG_UPDATE_CHECK_INTERVAL),
             $maxMessages,
             $maxRetries,
-            $this->getFromCache('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE'),
-            $this->getFromCache('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE'),
-            $this->getFromCache('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE')
+            $this->getFromCache(self::CFG_NEW_ORDER_TEMPLATE),
+            $this->getFromCache(self::CFG_ADMIN_LOGIN_TEMPLATE),
+            $this->getFromCache(self::CFG_NEW_CUSTOMER_TEMPLATE)
         );
         if (is_array($validate) && isset($validate[0])) {
             $this->logError('Invalid configuration: ' . json_encode($validate));
@@ -457,7 +472,7 @@ class TelegramNotifier extends Module
         $chatIdsArray = array_map('trim', explode(',', $chatIds));
 
         // Add an update notification at the beginning of the message
-        if ((bool) $this->getFromCache('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS')) {
+        if ((bool) $this->getFromCache(self::CFG_UPDATE_NOTIFICATIONS)) {
             $newVersion = $this->checkForUpdates();
             if ($newVersion) {
                 $updateMessage = '🎉 ' . $this->l('A new version of TelegramNotifier is available! Update to') . ' ' . $newVersion . ' ' . $this->l('to get the latest features and bug fixes.') . "\n";
@@ -950,7 +965,7 @@ class TelegramNotifier extends Module
 
     private function testTelegramMessage()
     {
-        if (empty($this->getFromCache('TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID'))) {
+        if (empty($this->getFromCache(self::CFG_NEW_ORDERS_CHAT_ID))) {
             return $this->displayError($this->l('Test message only sent to New Orders Chat ID. Please configure it first.'));
         }
 
@@ -965,14 +980,14 @@ class TelegramNotifier extends Module
 
     private function checkForUpdates()
     {
-        $lastCheckTime = $this->getFromCache('TELEGRAMNOTIFY_LAST_UPDATE_CHECK');
-        $checkIntervalHours = $this->getFromCache('TELEGRAMNOTIFY_UPDATE_CHECK_INTERVAL');
+        $lastCheckTime = $this->getFromCache(self::CFG_LAST_UPDATE_CHECK);
+        $checkIntervalHours = $this->getFromCache(self::CFG_UPDATE_CHECK_INTERVAL);
         $checkIntervalSeconds = $checkIntervalHours * 3600; // Convert hours to seconds
         $currentTime = time();
 
         // Check if we need to perform update check based on configured interval
         if ($lastCheckTime && ($currentTime - $lastCheckTime < $checkIntervalSeconds)) {
-            $cachedVersion = $this->getFromCache('TELEGRAMNOTIFY_CACHED_VERSION');
+            $cachedVersion = $this->getFromCache(self::CFG_CACHED_VERSION);
             return !empty($cachedVersion) ? $cachedVersion : '';
         }
 
@@ -981,7 +996,7 @@ class TelegramNotifier extends Module
 
         $response = $this->executeCurlRequest($url, null, $headers);
 
-        $this->setConfigValue('TELEGRAMNOTIFY_LAST_UPDATE_CHECK', $currentTime);
+        $this->setConfigValue(self::CFG_LAST_UPDATE_CHECK, $currentTime);
 
         if ($response['error']) {
             $this->logError('Failed to check for updates: ' . $response['error']);
@@ -996,10 +1011,10 @@ class TelegramNotifier extends Module
         $release = json_decode($response['result'], true);
 
         if (isset($release['tag_name']) && version_compare($release['tag_name'], $this->version, '>')) {
-            $this->setConfigValue('TELEGRAMNOTIFY_CACHED_VERSION', $release['tag_name']);
+            $this->setConfigValue(self::CFG_CACHED_VERSION, $release['tag_name']);
             return $release['tag_name'];
         } else {
-            $this->setConfigValue('TELEGRAMNOTIFY_CACHED_VERSION', '');
+            $this->setConfigValue(self::CFG_CACHED_VERSION, '');
             return '';
         }
     }
@@ -1025,17 +1040,17 @@ class TelegramNotifier extends Module
         }
 
         if (Tools::isSubmit('submit' . $this->name)) {
-            $botToken = $getConfigValueFromForm('TELEGRAMNOTIFY_BOT_TOKEN');
-            $newOrdersChatId = $getConfigValueFromForm('TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID');
-            $adminLoginChatId = $getConfigValueFromForm('TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID');
-            $newCustomerChatId = $getConfigValueFromForm('TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID');
-            $updateNotifications = (bool) $getConfigValueFromForm('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS');
-            $updateCheckInterval = $getConfigValueFromForm('TELEGRAMNOTIFY_UPDATE_CHECK_INTERVAL');
-            $maxMessages = $getConfigValueFromForm('TELEGRAMNOTIFY_MAX_MESSAGES');
-            $maxRetries = $getConfigValueFromForm('TELEGRAMNOTIFY_MAX_RETRIES');
-            $newOrderTemplate = $getConfigValueFromForm('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE');
-            $adminLoginTemplate = $getConfigValueFromForm('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE');
-            $newCustomerTemplate = $getConfigValueFromForm('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE');
+            $botToken = $getConfigValueFromForm(self::CFG_BOT_TOKEN);
+            $newOrdersChatId = $getConfigValueFromForm(self::CFG_NEW_ORDERS_CHAT_ID);
+            $adminLoginChatId = $getConfigValueFromForm(self::CFG_ADMIN_LOGIN_CHAT_ID);
+            $newCustomerChatId = $getConfigValueFromForm(self::CFG_NEW_CUSTOMER_CHAT_ID);
+            $updateNotifications = (bool) $getConfigValueFromForm(self::CFG_UPDATE_NOTIFICATIONS);
+            $updateCheckInterval = $getConfigValueFromForm(self::CFG_UPDATE_CHECK_INTERVAL);
+            $maxMessages = $getConfigValueFromForm(self::CFG_MAX_MESSAGES);
+            $maxRetries = $getConfigValueFromForm(self::CFG_MAX_RETRIES);
+            $newOrderTemplate = $getConfigValueFromForm(self::CFG_NEW_ORDER_TEMPLATE);
+            $adminLoginTemplate = $getConfigValueFromForm(self::CFG_ADMIN_LOGIN_TEMPLATE);
+            $newCustomerTemplate = $getConfigValueFromForm(self::CFG_NEW_CUSTOMER_TEMPLATE);
 
             $validationResult = $this->validateConfigurationData(
                 $botToken,
@@ -1052,17 +1067,17 @@ class TelegramNotifier extends Module
             );
 
             if (is_array($validationResult) && array_key_exists('newOrderTemplate', $validationResult)) {
-                $this->setConfigValue('TELEGRAMNOTIFY_BOT_TOKEN', $botToken);
-                $this->setConfigValue('TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID', $newOrdersChatId);
-                $this->setConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID', $adminLoginChatId);
-                $this->setConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID', $newCustomerChatId);
-                $this->setConfigValue('TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS', $updateNotifications);
-                $this->setConfigValue('TELEGRAMNOTIFY_UPDATE_CHECK_INTERVAL', $updateCheckInterval);
-                $this->setConfigValue('TELEGRAMNOTIFY_MAX_MESSAGES', $maxMessages);
-                $this->setConfigValue('TELEGRAMNOTIFY_MAX_RETRIES', $maxRetries);
-                $this->setConfigValue('TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE', $validationResult['newOrderTemplate']);
-                $this->setConfigValue('TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE', $validationResult['adminLoginTemplate']);
-                $this->setConfigValue('TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE', $validationResult['newCustomerTemplate']);
+                $this->setConfigValue(self::CFG_BOT_TOKEN, $botToken);
+                $this->setConfigValue(self::CFG_NEW_ORDERS_CHAT_ID, $newOrdersChatId);
+                $this->setConfigValue(self::CFG_ADMIN_LOGIN_CHAT_ID, $adminLoginChatId);
+                $this->setConfigValue(self::CFG_NEW_CUSTOMER_CHAT_ID, $newCustomerChatId);
+                $this->setConfigValue(self::CFG_UPDATE_NOTIFICATIONS, $updateNotifications);
+                $this->setConfigValue(self::CFG_UPDATE_CHECK_INTERVAL, $updateCheckInterval);
+                $this->setConfigValue(self::CFG_MAX_MESSAGES, $maxMessages);
+                $this->setConfigValue(self::CFG_MAX_RETRIES, $maxRetries);
+                $this->setConfigValue(self::CFG_NEW_ORDER_TEMPLATE, $validationResult['newOrderTemplate']);
+                $this->setConfigValue(self::CFG_ADMIN_LOGIN_TEMPLATE, $validationResult['adminLoginTemplate']);
+                $this->setConfigValue(self::CFG_NEW_CUSTOMER_TEMPLATE, $validationResult['newCustomerTemplate']);
 
                 $output .= $this->displayConfirmation($this->l('Settings updated'));
                 if ($validationResult['default']) {
@@ -1101,7 +1116,7 @@ class TelegramNotifier extends Module
                     [
                         'type' => 'text',
                         'label' => $this->l('🔑 Telegram Bot Token'),
-                        'name' => 'TELEGRAMNOTIFY_BOT_TOKEN',
+                        'name' => self::CFG_BOT_TOKEN,
                         'size' => 50,
                         'required' => true,
                         'desc' => $this->l('To get a Bot Token, create a new bot via @BotFather in Telegram.')
@@ -1109,7 +1124,7 @@ class TelegramNotifier extends Module
                     [
                         'type' => 'text',
                         'label' => $this->l('📦 New Orders Notification Chat ID(s)'),
-                        'name' => 'TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID',
+                        'name' => self::CFG_NEW_ORDERS_CHAT_ID,
                         'size' => 50,
                         'required' => false,
                         'desc' => $this->l('Enter one or more Chat IDs separated by commas. Use positive numbers for personal chats (e.g., 123456789), negative numbers for group chats (e.g., -987654321), or numbers starting with -100 for channels and some supergroups (e.g., -1001234567890) to receive new order notifications.')
@@ -1117,7 +1132,7 @@ class TelegramNotifier extends Module
                     [
                         'type' => 'text',
                         'label' => $this->l('🔐 Admin Login Notifications Chat ID(s)'),
-                        'name' => 'TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID',
+                        'name' => self::CFG_ADMIN_LOGIN_CHAT_ID,
                         'size' => 50,
                         'required' => false,
                         'desc' => $this->l('Enter Chat IDs to receive notifications when someone logs into the admin panel. Use the same format as above.')
@@ -1125,7 +1140,7 @@ class TelegramNotifier extends Module
                     [
                         'type' => 'text',
                         'label' => $this->l('🆕 New Customer Registration Notifications Chat ID(s)'),
-                        'name' => 'TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID',
+                        'name' => self::CFG_NEW_CUSTOMER_CHAT_ID,
                         'size' => 50,
                         'required' => false,
                         'desc' => $this->l('Enter Chat IDs to receive notifications for new customer registrations. Use the same format as above.')
@@ -1133,7 +1148,7 @@ class TelegramNotifier extends Module
                     [
                         'type' => 'switch',
                         'label' => $this->l('🔔 Telegram Update Notifications'),
-                        'name' => 'TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS',
+                        'name' => self::CFG_UPDATE_NOTIFICATIONS,
                         'is_bool' => true,
                         'values' => [
                             [
@@ -1152,7 +1167,7 @@ class TelegramNotifier extends Module
                     [
                         'type' => 'text',
                         'label' => $this->l('⏰ Update Check Interval (hours)'),
-                        'name' => 'TELEGRAMNOTIFY_UPDATE_CHECK_INTERVAL',
+                        'name' => self::CFG_UPDATE_CHECK_INTERVAL,
                         'size' => 5,
                         'required' => true,
                         'desc' => $this->l('How often to check for module updates (in hours). Default: 12 hours.')
@@ -1160,7 +1175,7 @@ class TelegramNotifier extends Module
                     [
                         'type' => 'text',
                         'label' => $this->l('📊 Max Messages per Action'),
-                        'name' => 'TELEGRAMNOTIFY_MAX_MESSAGES',
+                        'name' => self::CFG_MAX_MESSAGES,
                         'size' => 5,
                         'required' => true,
                         'desc' => $this->l('Enter the maximum number of messages to send per action (0 for unlimited). Default: 5.')
@@ -1168,7 +1183,7 @@ class TelegramNotifier extends Module
                     [
                         'type' => 'text',
                         'label' => $this->l('🔄 Max Retry Attempts'),
-                        'name' => 'TELEGRAMNOTIFY_MAX_RETRIES',
+                        'name' => self::CFG_MAX_RETRIES,
                         'size' => 5,
                         'required' => true,
                         'desc' => $this->l('Number of retry attempts for sending messages (0 to disable, recommended for stable connections). Default: 0.')
@@ -1176,7 +1191,7 @@ class TelegramNotifier extends Module
                     [
                         'type' => 'textarea',
                         'label' => $this->l('📝 New Order Notification Template'),
-                        'name' => 'TELEGRAMNOTIFY_NEW_ORDER_TEMPLATE',
+                        'name' => self::CFG_NEW_ORDER_TEMPLATE,
                         'cols' => 60,
                         'rows' => 10,
                         'required' => true,
@@ -1185,7 +1200,7 @@ class TelegramNotifier extends Module
                     [
                         'type' => 'textarea',
                         'label' => $this->l('🔒 Admin Login Notification Template'),
-                        'name' => 'TELEGRAMNOTIFY_ADMIN_LOGIN_TEMPLATE',
+                        'name' => self::CFG_ADMIN_LOGIN_TEMPLATE,
                         'cols' => 60,
                         'rows' => 10,
                         'required' => true,
@@ -1194,7 +1209,7 @@ class TelegramNotifier extends Module
                     [
                         'type' => 'textarea',
                         'label' => $this->l('👤 New Customer Notification Template'),
-                        'name' => 'TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE',
+                        'name' => self::CFG_NEW_CUSTOMER_TEMPLATE,
                         'cols' => 60,
                         'rows' => 10,
                         'required' => true,

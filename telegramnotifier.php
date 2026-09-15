@@ -139,8 +139,16 @@ class TelegramNotifier extends Module
     {
         // Load all known configuration keys as per schema into the local cache.
         $this->configCache = [];
-        foreach ($this->getConfigSchema() as $key => $meta) {
-            $this->configCache[$key] = $this->getFromCache($key);
+
+        $schema = $this->getConfigSchema();
+        $keys = array_keys($schema);
+
+        // Use a single query to fetch all configuration values for the current shop context.
+        $rawValues = Configuration::getMultiple($keys);
+
+        foreach ($schema as $key => $meta) {
+            $rawValue = array_key_exists($key, $rawValues) ? $rawValues[$key] : false;
+            $this->configCache[$key] = $this->castFromDb($key, $rawValue);
         }
     }
 

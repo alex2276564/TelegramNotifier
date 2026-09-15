@@ -927,6 +927,67 @@ class TelegramNotifier extends Module
             "📰 Subscribed to newsletter: {newsletter}";
     }
 
+    /**
+     * Sanitize country name returned by external IP geolocation API.
+     *
+     * We only sanitize data coming from third-party HTTP APIs here.
+     * Data that goes through PrestaShop core input/output APIs is already
+     * validated and escaped by PrestaShop itself.
+     */
+    private function sanitizeExternalCountry($value)
+    {
+        if (!is_string($value)) {
+            return 'Unknown';
+        }
+
+        // Remove ASCII control characters.
+        $value = preg_replace('/[\x00-\x1F\x7F]/', ' ', $value);
+        // Collapse whitespace.
+        $value = preg_replace('/\s+/u', ' ', $value);
+        $value = trim($value);
+
+        if ($value === '') {
+            return 'Unknown';
+        }
+
+        // Limit length to a reasonable size.
+        if (mb_strlen($value, 'UTF-8') > 60) {
+            $value = mb_substr($value, 0, 57, 'UTF-8') . '...';
+        }
+
+        return $value;
+    }
+
+    /**
+     * Sanitize GitHub release tag names used for update checks.
+     *
+     * Only a conservative set of characters is allowed. If the tag
+     * does not match, an empty string is returned and treated as
+     * "no valid update information".
+     *
+     * We only sanitize third-party API values here; internal module
+     * data and PrestaShop configuration values are handled by
+     * PrestaShop's own validation/escaping.
+     */
+    private function sanitizeExternalVersionTag($value)
+    {
+        if (!is_string($value)) {
+            return '';
+        }
+
+        $value = trim($value);
+
+        if ($value === '') {
+            return '';
+        }
+
+        if (!preg_match('/^[0-9A-Za-z._+\-~]{1,40}$/', $value)) {
+            return '';
+        }
+
+        return $value;
+    }
+
     private function getCountryFromIP($ip)
     {
         $url = "http://ip-api.com/json/{$ip}";
@@ -934,8 +995,13 @@ class TelegramNotifier extends Module
         if ($response['error'] || $response['httpCode'] != 200) {
             return 'Unknown';
         }
+
         $data = json_decode($response['result'], true);
-        return $data['country'] ?? 'Unknown';
+        if (!is_array($data) || !isset($data['country'])) {
+            return 'Unknown';
+        }
+
+        return $this->sanitizeExternalCountry($data['country']);
     }
 
     private function getGenderName($id_gender)
@@ -1018,13 +1084,18 @@ class TelegramNotifier extends Module
 
         $release = json_decode($response['result'], true);
 
-        if (isset($release['tag_name']) && version_compare($release['tag_name'], $this->version, '>')) {
-            $this->setConfigValue(self::CFG_CACHED_VERSION, $release['tag_name']);
-            return $release['tag_name'];
-        } else {
-            $this->setConfigValue(self::CFG_CACHED_VERSION, '');
-            return '';
+        if (isset($release['tag_name'])) {
+            $tag = $this->sanitizeExternalVersionTag($release['tag_name']);
+
+            if ($tag !== '' && version_compare($tag, $this->version, '>')) {
+                $this->setConfigValue(self::CFG_CACHED_VERSION, $tag);
+                return $tag;
+            }
         }
+
+        // Either tag_name is missing, invalid, or not newer than current version.
+        $this->setConfigValue(self::CFG_CACHED_VERSION, '');
+        return '';
     }
 
     public function getContent()

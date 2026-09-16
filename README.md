@@ -154,6 +154,7 @@ After installing TelegramNotifier, you'll enter the module configuration and enc
 
    **New Customer Notification Template:**
 
+   - `{shop_name}`: The name of the shop 🛍️
    - `{customer_name}`: Name of the customer 👤
    - `{customer_email}`: Email address of the customer 📧
    - `{ip_address}`: The IP address of the customer 🌐

@@ -215,6 +215,7 @@ class TelegramNotifier extends Module
             $newCustomerTemplate = $this->getFromCache(self::CFG_NEW_CUSTOMER_TEMPLATE);
 
             $placeholders = [
+                '{shop_name}' => '',
                 '{customer_name}' => '',
                 '{customer_email}' => '',
                 '{ip_address}' => '',
@@ -224,6 +225,11 @@ class TelegramNotifier extends Module
                 '{gender}' => '',
                 '{newsletter}' => '',
             ];
+
+            if (strpos($newCustomerTemplate, '{shop_name}') !== false) {
+                $shop = new Shop($customer->id_shop);
+                $placeholders['{shop_name}'] = $shop->name;
+            }
 
             if (strpos($newCustomerTemplate, '{customer_name}') !== false) {
                 $placeholders['{customer_name}'] = $customer->firstname . ' ' . $customer->lastname;
@@ -986,6 +992,7 @@ class TelegramNotifier extends Module
     private function getDefaultNewCustomerTemplate()
     {
         return "🆕 New Customer Registration\n" .
+            "🏪 Shop: {shop_name}\n" .
             "👤 Customer: {customer_name}\n" .
             "📧 Email: {customer_email}\n" .
             "🌐 IP: {ip_address}\n" .
@@ -1361,7 +1368,7 @@ class TelegramNotifier extends Module
                         'cols' => 60,
                         'rows' => 10,
                         'required' => true,
-                        'desc' => $this->l('Available placeholders: {customer_name}, {customer_email}, {ip_address}, {country}, {date_time}, {birthday}, {gender}, {newsletter}.')
+                        'desc' => $this->l('Available placeholders: {shop_name}, {customer_name}, {customer_email}, {ip_address}, {country}, {date_time}, {birthday}, {gender}, {newsletter}.')
                     ],
                 ],
                 'submit' => [

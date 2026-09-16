@@ -728,7 +728,7 @@ class TelegramNotifier extends Module
             $success = curl_exec($ch);
             $error = curl_error($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
+            unset($ch);
 
             if ($bodyTooLarge && $error === '') {
                 $error = 'HTTP response too large';
@@ -806,6 +806,8 @@ class TelegramNotifier extends Module
             ];
 
             curl_multi_remove_handle($mh, $ch);
+
+            unset($curlHandles[$index], $ch);
         }
 
         curl_multi_close($mh);

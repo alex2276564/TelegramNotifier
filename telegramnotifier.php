@@ -516,7 +516,12 @@ class TelegramNotifier extends Module
         }
 
         if ($maxRetries === 0) {
-            $results = $this->executeCurlRequest($urls, $postData, [], true);
+            $headers = [
+                'Content-Type: application/json',
+                'Accept: application/json',
+            ];
+
+            $results = $this->executeCurlRequest($urls, $postData, $headers, true);
             $success = true;
 
             foreach ($results as $result) {
@@ -540,8 +545,13 @@ class TelegramNotifier extends Module
         $attempt = 0;
         $success = false;
 
+        $headers = [
+            'Content-Type: application/json',
+            'Accept: application/json',
+        ];
+
         while ($attempt < $maxRetries) {
-            $results = $this->executeCurlRequest($urls, $postData, [], true);
+            $results = $this->executeCurlRequest($urls, $postData, $headers, true);
             $success = true;
 
             foreach ($results as $result) {
@@ -707,7 +717,13 @@ class TelegramNotifier extends Module
 
             if ($postData !== null) {
                 curl_setopt($ch, CURLOPT_POST, 1);
-                curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postData));
+
+                $payload = json_encode($postData);
+                if ($payload === false) {
+                    $payload = '{}';
+                }
+
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
             }
 
             $buffer = '';
@@ -728,6 +744,7 @@ class TelegramNotifier extends Module
             $success = curl_exec($ch);
             $error = curl_error($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
             unset($ch);
 
             if ($bodyTooLarge && $error === '') {
@@ -761,7 +778,13 @@ class TelegramNotifier extends Module
 
             if ($postData !== null && isset($postData[$index])) {
                 curl_setopt($ch, CURLOPT_POST, 1);
-                curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postData[$index]));
+
+                $payload = json_encode($postData[$index]);
+                if ($payload === false) {
+                    $payload = '{}';
+                }
+
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
             }
 
             $bodies[$index] = '';

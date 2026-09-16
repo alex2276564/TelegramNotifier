@@ -714,6 +714,7 @@ class TelegramNotifier extends Module
             curl_setopt($ch, CURLOPT_URL, $urls);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
             curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
             curl_setopt($ch, CURLOPT_TIMEOUT, 10);
 
@@ -775,6 +776,7 @@ class TelegramNotifier extends Module
             curl_setopt($ch, CURLOPT_URL, $url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
             curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
             curl_setopt($ch, CURLOPT_TIMEOUT, 10);
 
@@ -1003,12 +1005,16 @@ class TelegramNotifier extends Module
             "📰 Subscribed to newsletter: {newsletter}";
     }
 
+    // =========================================================================
+    // EXTERNAL API SANITIZATION
+    // =========================================================================
     /**
-     * Sanitize country name returned by external IP geolocation API.
+     * The following methods apply lightweight, context-aware sanitization
+     * strictly to data received from external third-party services (APIs).
      *
-     * We only sanitize data coming from third-party HTTP APIs here.
-     * Data that goes through PrestaShop core input/output APIs is already
-     * validated and escaped by PrestaShop itself.
+     * Internal module data and values originating from the PrestaShop shop
+     * environment are NOT processed here, as they are already inherently
+     * validated and escaped by PrestaShop's core infrastructure.
      */
     private function sanitizeExternalCountry($value)
     {
@@ -1034,17 +1040,6 @@ class TelegramNotifier extends Module
         return $value;
     }
 
-    /**
-     * Sanitize GitHub release tag names used for update checks.
-     *
-     * Only a conservative set of characters is allowed. If the tag
-     * does not match, an empty string is returned and treated as
-     * "no valid update information".
-     *
-     * We only sanitize third-party API values here; internal module
-     * data and PrestaShop configuration values are handled by
-     * PrestaShop's own validation/escaping.
-     */
     private function sanitizeExternalVersionTag($value)
     {
         if (!is_string($value)) {
@@ -1066,6 +1061,9 @@ class TelegramNotifier extends Module
 
     private function getCountryFromIP($ip)
     {
+        // SECURITY NOTE: Plain HTTP is used because ip-api.com requires a paid subscription for HTTPS access.
+        // MITM exposure is accepted here as these geolocation data points are non-critical and 
+        // strictly validated via sanitizeExternalCountry to prevent any injection vectors.
         $url = "http://ip-api.com/json/{$ip}";
         $response = $this->executeCurlRequest($url);
         if ($response['error'] || $response['httpCode'] != 200) {

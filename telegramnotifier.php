@@ -1062,7 +1062,7 @@ class TelegramNotifier extends Module
     private function getCountryFromIP($ip)
     {
         // SECURITY NOTE: Plain HTTP is used because ip-api.com requires a paid subscription for HTTPS access.
-        // MITM exposure is accepted here as these geolocation data points are non-critical and 
+        // MITM exposure is accepted here as these geolocation data points are non-critical and
         // strictly validated via sanitizeExternalCountry to prevent any injection vectors.
         $url = "http://ip-api.com/json/{$ip}";
         $response = $this->executeCurlRequest($url);

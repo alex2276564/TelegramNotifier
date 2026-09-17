@@ -1,0 +1,8 @@
+AUTONOMY MODE:
+Dynamically analyze the repo structure and autonomously skip all non-production files, test suites, build artifacts, and package caches (like gradle, node_modules, build, target). Focus 100% of reasoning exclusively on core production source code and active endpoints.
+
+RULES:
+1. Always check README.md and SECURITY.md first at the beginning of the execution.
+2. Before reporting any vulnerability or raising an alert, cross-reference your findings with SECURITY.md to verify if the issue is already documented, explicitly allowed, or handled by existing security policies.
+3. FILTRATION OF INVALID PRE-REQUISITES: Evaluate every issue strictly within the context of achievable attacker access, discarding findings as false positives if their execution depends on absurd initial prerequisites like pre-existing root/admin OS privileges, physical infrastructure access, or full server filesystem control from the very start.
+

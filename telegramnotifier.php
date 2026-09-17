@@ -1024,6 +1024,10 @@ class TelegramNotifier extends Module
 
         // Remove ASCII control characters.
         $value = preg_replace('/[\x00-\x1F\x7F]/', ' ', $value);
+
+        // Strip angle brackets to prevent HTML tag injection in Telegram (parse_mode=HTML).
+        $value = str_replace(['<', '>'], '', $value);
+
         // Collapse whitespace.
         $value = preg_replace('/\s+/u', ' ', $value);
         $value = trim($value);

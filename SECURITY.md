@@ -17,8 +17,9 @@ For **enterprise-grade security requirements**, use **commercially supported sol
 4. **Sensitive data exposure**
 5. **XSS**
 6. **Network attacks**
-7. **Dependency updating**
-8. **Business logic bypass**
+7. **Social engineering**
+8. **Dependency updating**
+9. **Business logic bypass**
 
 ---
 
@@ -141,6 +142,33 @@ is the primary supply-chain control instead.
 ## Security scanning
 
 Security scans (SCA/SAST/IAST) covering the codebase, its dependencies, and the CI/GitHub Actions pipeline are run regularly: SCA/SAST checks are triggered automatically on every commit and on a daily schedule, while deeper IAST scans (using AI agents) are launched manually during major refactors or upon request.
+
+---
+
+## Social engineering
+
+**Message splitting attack:**
+
+If a customer includes a very long comment or address in an order (approaching the 4096-character Telegram message limit), the notification will be split into multiple separate messages. An attacker could craft the input such that the second message starts with text that mimics an update notification:
+
+```text
+[Message 2]:
+...end of customer data...
+
+🎉 TelegramNotifier update available!
+Download: https://github.com/a1ex2276564/TelegramNotifier
+```
+
+This could trick recipients into believing the module is prompting them to download an update from a malicious repository.
+
+**Mitigation:**
+
+- **User awareness:** Train notification recipients to verify updates only through trusted channels (PrestaShop admin panel, official GitHub repository).
+- **Update verification:** Always verify the repository URL (`alex2276564`, not lookalikes like `a1ex` or `alex22765564`).
+- **SLSA provenance:** Use the SHA-256 checksums and SLSA provenance files published with each release to verify authenticity.
+- **PrestaShop Addons:** Note that PrestaShop Addons does not verify third-party modules with cryptographic signatures or SLSA attestations.
+
+**This is not a vulnerability in the module itself**, but rather a risk inherent to any notification system that includes user-controlled content.
 
 ---
 

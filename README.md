@@ -181,6 +181,22 @@ The Admin Login Notifications feature helps you monitor access to your store's b
 
 ## 🔧 Troubleshooting
 
+### 🔍 Checking for Updates
+
+You can check for module updates in several ways:
+
+1. **PrestaShop Admin Panel (Internal Module Update UI):**
+   - Since this is a third-party module and PrestaShop's native automatic update system does not support external modules out of the box, you need to check for updates manually inside the module configuration page.
+   - Go to `Modules > Module Manager`, find the **TelegramNotifier** module, and click the **Configure** button.
+   - If a new version is available, an update notification banner will be prominently displayed at the top of the module settings page.
+
+2. **Telegram Notifications (If Enabled):**
+   - If you have enabled the "Telegram Update Notifications" option in the module settings, the **first message** of any triggered notification layout will include a notice if a newer version is available.
+
+3. **GitHub Releases Page:**
+   - You can always check the latest official releases directly at: https://github.com/alex2276564/TelegramNotifier/releases/latest
+   - Simply compare the latest online tag with the version number installed on your server.
+
 ### 📋 Viewing Error Logs
 
 Errors can be found in the Advanced Parameters and Logs section of the PrestaShop admin panel. You can navigate to `Advanced Parameters > Logs` to view the event log and debug any issues related to the module.

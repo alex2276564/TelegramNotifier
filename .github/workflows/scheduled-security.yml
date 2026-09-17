@@ -200,7 +200,6 @@ jobs:
         env:
           STRIX_SCAN_MODE: ${{ github.event.inputs.scan_mode }}
           STRIX_SCOPE_MODE: ${{ github.event.inputs.scope_mode }}
-          STRIX_INSTRUCTION: ${{ github.event.inputs.instruction }}
         run: |
           strix -n \
             -t ./ \

@@ -74,7 +74,7 @@ on:
   workflow_dispatch:
     inputs:
       release_version:
-        description: "Release version (e.g. 1.0.9)"
+        description: "Release version (e.g. 1.0.0)"
         required: true
         type: string
       release_notes:
@@ -97,6 +97,7 @@ jobs:
       zip_file: ${{ steps.zip.outputs.zip_file }}
       zip_name: ${{ steps.zip.outputs.zip_name }}
       sha256: ${{ steps.zip.outputs.sha256 }}
+      slsa_subjects: ${{ steps.subjects.outputs.subjects_b64 }}
 
     steps:
       - name: Harden Runner
@@ -208,6 +209,18 @@ jobs:
           echo "Built ZIP: $ZIP_FILE"
           echo "SHA-256 : $SHA"
 
+      - name: Build SLSA subjects (sha256sum → base64)
+        id: subjects
+        shell: bash
+        env:
+          ZIP_FILE: ${{ steps.zip.outputs.zip_file }}
+        run: |
+          set -euo pipefail
+          # sha256sum outputs lines in the following format: “<hash>  <filename>”
+          # base64 -w0 (GNU) → a single line without line breaks; on macOS, the fallback is used without -w0
+          SUBJECTS_B64=$(sha256sum "$ZIP_FILE" | base64 -w0 2>/dev/null || sha256sum "$ZIP_FILE" | base64)
+          echo "subjects_b64=$SUBJECTS_B64" >> "$GITHUB_OUTPUT"
+
       - name: Upload ZIP as workflow artifact
         uses: actions/upload-artifact@main
         with:
@@ -232,18 +245,14 @@ jobs:
 
     permissions:
       actions: read
-      id-token: write # required for Sigstore/OIDC signing
-      contents: write # required to upload provenance as artifact
+      id-token: write   # required for Sigstore/OIDC signing
+      contents: write   # required to upload provenance as artifact
 
     # SLSA generic generator: MUST be pinned to exact semver tag (vX.Y.Z)
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
     with:
-      # Path to the artifact to attest, relative to the repository root.
-      # This path must match the ZIP produced in the build job.
-      subject-path: ${{ needs.build.outputs.zip_file }}
-
-      # Repo is public, so we explicitly allow logging to public Rekor
-      rekor-log-public: true
+      # Base64-encoded sha256sum output ("<hash>  <filename>"), produced in the build job.
+      base64-subjects: ${{ needs.build.outputs.slsa_subjects }}
 
   # ================================================================
   # 🚀 GITHUB RELEASE

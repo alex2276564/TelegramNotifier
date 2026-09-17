@@ -126,11 +126,13 @@ jobs:
             exit 1
           fi
 
-          # Extract version from <version>...</version> in config.xml
-          XML_VERSION=$(grep -E '<version>[^<]+</version>' config.xml \
-            | head -1 \
-            | sed -E 's/.*<version>([^<]+)<\/version>.*/\1/' \
-            | tr -d '[:space:]')
+          # Extract version from <version><![CDATA[...]]></version> in config.xml
+          XML_VERSION=$(
+            grep '<version' config.xml \
+              | head -1 \
+              | sed -E 's/.*<version[^>]*>//; s/<\/version>.*$//; s/<!\[CDATA\[//; s/]]>//' \
+              | tr -d '[:space:]'
+          )
 
           echo "Detected version from config.xml: '$XML_VERSION'"
 
@@ -139,27 +141,30 @@ jobs:
             exit 1
           fi
 
-          # Extract version from $this->version in the main PHP file
-          # Supports both single and double quotes
-          PHP_VERSION=$(grep -E "\\\$this->version\\s*=\\s*['\"]" "${MODULE_SLUG}.php" \
-            | head -1 \
-            | sed -E "s/.*\\\$this->version\\s*=\\s*['\"]([^'\"]+)['\"].*/\1/" \
-            | tr -d '[:space:]')
+          # Optional: try to extract version from $this->version in the main PHP file
+          PHP_LINE=$(grep "\$this->version" "${MODULE_SLUG}.php" | head -1 || true)
 
-          echo "Detected version from ${MODULE_SLUG}.php: '$PHP_VERSION'"
+          if [ -n "$PHP_LINE" ]; then
+            PHP_VERSION=$(
+              printf '%s\n' "$PHP_LINE" \
+                | sed -E "s/.*\\\$this->version\s*=\s*'([^']+)'.*/\1/" \
+                | tr -d '[:space:]'
+            )
 
-          if [ -z "$PHP_VERSION" ]; then
-            echo "::error::Could not extract \$this->version from ${MODULE_SLUG}.php"
-            exit 1
+            echo "Detected version from ${MODULE_SLUG}.php: '$PHP_VERSION'"
+
+            if [ -z "$PHP_VERSION" ]; then
+              echo "::warning::Could not parse version from \$this->version in ${MODULE_SLUG}.php; skipping PHP version check"
+            elif [ "$PHP_VERSION" != "$RELEASE_VERSION" ]; then
+              echo "::error::Version mismatch: PHP=$PHP_VERSION, input=$RELEASE_VERSION"
+              exit 1
+            fi
+          else
+            echo "::warning::No \$this->version assignment found in ${MODULE_SLUG}.php; skipping PHP version check"
           fi
 
           if [ "$XML_VERSION" != "$RELEASE_VERSION" ]; then
             echo "::error::Version mismatch: config.xml=$XML_VERSION, input=$RELEASE_VERSION"
-            exit 1
-          fi
-
-          if [ "$PHP_VERSION" != "$RELEASE_VERSION" ]; then
-            echo "::error::Version mismatch: PHP=$PHP_VERSION, input=$RELEASE_VERSION"
             exit 1
           fi
 

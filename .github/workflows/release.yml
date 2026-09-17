@@ -277,13 +277,11 @@ jobs:
           name: module-zip
           path: dist
 
-      - name: Download SLSA attestations artifact
+      - name: Download SLSA provenance artifact
         uses: actions/download-artifact@main
         with:
-          # The artifact name varies, but always ends with “-slsa-attestations”
-          pattern: "*-slsa-attestations"
+          name: ${{ needs.provenance.outputs['provenance-name'] }}
           path: slsa
-          merge-multiple: true
 
       - name: Extract SLSA provenance file
         shell: bash
@@ -293,22 +291,22 @@ jobs:
           set -euo pipefail
           mkdir -p dist
 
-          # Unzip all .tgz files that may have arrived
+          # Unpack any .tgz archives if present (builder-style artifacts)
           shopt -s nullglob
           for tgz in slsa/**/*.tgz slsa/*.tgz; do
             echo "Unpacking $tgz"
             tar -xzf "$tgz" -C slsa
           done
 
-          # Find a .slsa file
-          SLSA_FILE=$(find slsa -type f -name '*.slsa' | head -1)
+          # Look for either .slsa or .intoto.jsonl files
+          SLSA_FILE=$(find slsa -type f \( -name '*.slsa' -o -name '*.intoto.jsonl' \) | head -1)
           if [ -z "$SLSA_FILE" ]; then
-            echo "::error::No .slsa provenance file found in SLSA artifact"
+            echo "::error::No provenance file (.slsa or .intoto.jsonl) found in 'slsa' directory"
             find slsa -maxdepth 3 -type f || true
             exit 1
           fi
 
-          # Copy it next to the ZIP file and give it a descriptive name
+          # Copy it next to the ZIP file and give it a stable, user-friendly name
           cp -- "$SLSA_FILE" "dist/${ZIP_NAME}.build.slsa"
           echo "Provenance copied to dist/${ZIP_NAME}.build.slsa"
 

@@ -129,9 +129,10 @@ jobs:
           # Extract version from <version>...</version> in config.xml
           XML_VERSION=$(grep -E '<version>[^<]+</version>' config.xml \
             | head -1 \
-            | sed -E 's/.*<version>([^<]+)<\/version>.*/\1/')
+            | sed -E 's/.*<version>([^<]+)<\/version>.*/\1/' \
+            | tr -d '[:space:]')
 
-          echo "Detected version from config.xml: $XML_VERSION"
+          echo "Detected version from config.xml: '$XML_VERSION'"
 
           if [ -z "$XML_VERSION" ]; then
             echo "::error::Could not extract <version> from config.xml"
@@ -139,11 +140,13 @@ jobs:
           fi
 
           # Extract version from $this->version in the main PHP file
-          PHP_VERSION=$(grep -E "\\\$this->version\\s*=\\s*" "${MODULE_SLUG}.php" \
+          # Supports both single and double quotes
+          PHP_VERSION=$(grep -E "\\\$this->version\\s*=\\s*['\"]" "${MODULE_SLUG}.php" \
             | head -1 \
-            | sed -E "s/.*\\\$this->version\\s*=\\s*'([^']+)'.*/\1/")
+            | sed -E "s/.*\\\$this->version\\s*=\\s*['\"]([^'\"]+)['\"].*/\1/" \
+            | tr -d '[:space:]')
 
-          echo "Detected version from ${MODULE_SLUG}.php: $PHP_VERSION"
+          echo "Detected version from ${MODULE_SLUG}.php: '$PHP_VERSION'"
 
           if [ -z "$PHP_VERSION" ]; then
             echo "::error::Could not extract \$this->version from ${MODULE_SLUG}.php"

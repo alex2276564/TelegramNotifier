@@ -194,7 +194,7 @@ You can check for module updates in several ways:
    - If you have enabled the "Telegram Update Notifications" option in the module settings, the **first message** of any triggered notification layout will include a notice if a newer version is available.
 
 3. **GitHub Releases Page:**
-   - You can always check the latest official releases directly at: https://github.com/alex2276564/TelegramNotifier/releases/latest
+   - You can always check the latest official releases directly at: <https://github.com/alex2276564/TelegramNotifier/releases/latest>
    - Simply compare the latest online tag with the version number installed on your server.
 
 ### 📋 Viewing Error Logs

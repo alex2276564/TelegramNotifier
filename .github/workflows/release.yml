@@ -174,12 +174,7 @@ jobs:
       - name: Move module files
         run: |
           set -euo pipefail
-          FILES="LICENSE README.md ${MODULE_SLUG}.php config.xml index.php logo.png"
-          # Include upgrade directory if it exists
-          if [ -d upgrade ]; then
-            FILES="$FILES upgrade"
-          fi
-          mv $FILES "${MODULE_DIR}"
+          mv LICENSE README.md "${MODULE_SLUG}.php" config.xml index.php logo.png upgrade "${MODULE_DIR}"
 
       - name: Build release ZIP (reproducible)
         run: |

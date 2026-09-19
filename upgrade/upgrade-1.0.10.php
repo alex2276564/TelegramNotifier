@@ -3,7 +3,8 @@
  * Upgrade script for TelegramNotifier v1.0.10
  *
  * Changes:
- * - Adds {shop_name} placeholder to new customer template for multi-shop support
+ * - Adds {shop_name} placeholder to new customer template for multi-shop support.
+ * - Resets cached update information
  */
 
 if (!defined('_PS_VERSION_')) {
@@ -18,43 +19,50 @@ if (!defined('_PS_VERSION_')) {
  */
 function upgrade_module_1_0_10($module)
 {
-    // Use the module's constant for config key
+    $ok = true;
+
+    // -------------------------------------------------------------------------
+    // 1) Add {shop_name} placeholder to the existing "New Customer" template
+    // -------------------------------------------------------------------------
+
     $configKey = 'TELEGRAMNOTIFY_NEW_CUSTOMER_TEMPLATE';
 
-    // Get current template
+    // Get current template for new customer notifications.
     $currentTemplate = Configuration::get($configKey);
 
-    // Skip if template is empty or already contains {shop_name}
-    if (empty($currentTemplate) || strpos($currentTemplate, '{shop_name}') !== false) {
-        return true;
+    // Only modify the template if it is non-empty and does not yet contain {shop_name}.
+    if (!empty($currentTemplate) && strpos($currentTemplate, '{shop_name}') === false) {
+        // Prepend the shop line at the beginning.
+        $newTemplate = "🏪 Shop: {shop_name}\n" . $currentTemplate;
+
+        if (!Configuration::updateValue($configKey, $newTemplate)) {
+            PrestaShopLogger::addLog(
+                'TelegramNotifier upgrade 1.0.10: Failed to update new customer template',
+                3,
+                null,
+                'Module',
+                $module->id,
+                true
+            );
+            $ok = false;
+        } else {
+            PrestaShopLogger::addLog(
+                'TelegramNotifier upgrade 1.0.10: Successfully added {shop_name} placeholder to new customer template',
+                1,
+                null,
+                'Module',
+                $module->id,
+                true
+            );
+        }
     }
 
-    // Add {shop_name} placeholder at the beginning
-    $newTemplate = "🏪 Shop: {shop_name}\n" . $currentTemplate;
+    // -------------------------------------------------------------------------
+    // 2) Reset cached update information
+    // -------------------------------------------------------------------------
 
-    // Save updated template
-    $result = Configuration::updateValue($configKey, $newTemplate);
+    Configuration::updateValue('TELEGRAMNOTIFY_LAST_UPDATE_CHECK', 0);
+    Configuration::updateValue('TELEGRAMNOTIFY_CACHED_VERSION', '');
 
-    if (!$result) {
-        PrestaShopLogger::addLog(
-            'TelegramNotifier upgrade 1.0.10: Failed to update new customer template',
-            3,
-            null,
-            'Module',
-            $module->id,
-            true
-        );
-        return false;
-    }
-
-    PrestaShopLogger::addLog(
-        'TelegramNotifier upgrade 1.0.10: Successfully added {shop_name} placeholder to new customer template',
-        1,
-        null,
-        'Module',
-        $module->id,
-        true
-    );
-
-    return true;
+    return $ok;
 }

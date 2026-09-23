@@ -98,7 +98,7 @@ After installing TelegramNotifier, you'll enter the module configuration and enc
 
    - This setting controls which external service is used to resolve the customer's IP address for the `{country}` placeholder.
    - By default, the module uses `https://free.freeipapi.com/api/v1/json/{ip}` (HTTPS, completely free, no API key required, and allowed for commercial use).
-   - You can change this to any alternative provider that returns a JSON response containing a `countryName` or `country` field (for example, `https://ipwho.is/{ip}` or your own custom endpoint).
+   - You can change this to any alternative provider that returns a JSON response containing a `countryName` or `country` field (for example, `https://ipwho.is/{ip}`, a local service like `http://localhost/{ip}`, or your own custom endpoint).
    - If your provider requires authorization, you can include API keys directly in the URL query string or path (e.g., `https://api.example.com/lookup?key=YOUR_TOKEN&ip={ip}`).
    - **Note:** The `{ip}` placeholder in the URL is strictly required.
 

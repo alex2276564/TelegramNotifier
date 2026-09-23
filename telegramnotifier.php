@@ -178,40 +178,29 @@ class TelegramNotifier extends Module
             $installResult = $installResult && $this->registerHook($hook);
         }
 
-        return $installResult &&
-            $this->setConfigValue(self::CFG_BOT_TOKEN, '') &&
-            $this->setConfigValue(self::CFG_NEW_ORDERS_CHAT_ID, '') &&
-            $this->setConfigValue(self::CFG_ADMIN_LOGIN_CHAT_ID, '') &&
-            $this->setConfigValue(self::CFG_NEW_CUSTOMER_CHAT_ID, '') &&
-            $this->setConfigValue(self::CFG_IP_GEO_ENDPOINT, 'https://free.freeipapi.com/api/v1/json/{ip}') &&
-            $this->setConfigValue(self::CFG_UPDATE_NOTIFICATIONS, true) &&
-            $this->setConfigValue(self::CFG_UPDATE_CHECK_INTERVAL, 12) &&
-            $this->setConfigValue(self::CFG_MAX_MESSAGES, 5) &&
-            $this->setConfigValue(self::CFG_MAX_RETRIES, 0) &&
-            $this->setConfigValue(self::CFG_NEW_ORDER_TEMPLATE, $this->getDefaultNewOrderTemplate()) &&
-            $this->setConfigValue(self::CFG_ADMIN_LOGIN_TEMPLATE, $this->getDefaultAdminLoginTemplate()) &&
-            $this->setConfigValue(self::CFG_NEW_CUSTOMER_TEMPLATE, $this->getDefaultNewCustomerTemplate()) &&
-            $this->setConfigValue(self::CFG_LAST_UPDATE_CHECK, 0) &&
-            $this->setConfigValue(self::CFG_CACHED_VERSION, '');
+        if (!$installResult) {
+            return false;
+        }
+
+        $schema = $this->getConfigSchema();
+        foreach ($schema as $key => $meta) {
+            $default = $meta['default'];
+            $installResult = $installResult && $this->setConfigValue($key, $default);
+        }
+
+        return $installResult;
     }
 
     public function uninstall()
     {
-        return parent::uninstall() &&
-            $this->deleteConfigValue(self::CFG_BOT_TOKEN) &&
-            $this->deleteConfigValue(self::CFG_NEW_ORDERS_CHAT_ID) &&
-            $this->deleteConfigValue(self::CFG_ADMIN_LOGIN_CHAT_ID) &&
-            $this->deleteConfigValue(self::CFG_NEW_CUSTOMER_CHAT_ID) &&
-            $this->deleteConfigValue(self::CFG_IP_GEO_ENDPOINT) &&
-            $this->deleteConfigValue(self::CFG_UPDATE_NOTIFICATIONS) &&
-            $this->deleteConfigValue(self::CFG_UPDATE_CHECK_INTERVAL) &&
-            $this->deleteConfigValue(self::CFG_MAX_MESSAGES) &&
-            $this->deleteConfigValue(self::CFG_MAX_RETRIES) &&
-            $this->deleteConfigValue(self::CFG_NEW_ORDER_TEMPLATE) &&
-            $this->deleteConfigValue(self::CFG_ADMIN_LOGIN_TEMPLATE) &&
-            $this->deleteConfigValue(self::CFG_NEW_CUSTOMER_TEMPLATE) &&
-            $this->deleteConfigValue(self::CFG_LAST_UPDATE_CHECK) &&
-            $this->deleteConfigValue(self::CFG_CACHED_VERSION);
+        $result = parent::uninstall();
+        $schema = $this->getConfigSchema();
+
+        foreach ($schema as $key => $meta) {
+            $result = $result && $this->deleteConfigValue($key);
+        }
+
+        return $result;
     }
 
     public function hookActionCustomerAccountAdd($params)
@@ -937,15 +926,15 @@ class TelegramNotifier extends Module
         }
 
         if (empty($newOrderTemplate)) {
-            $newOrderTemplate = $this->getDefaultNewOrderTemplate();
+            $newOrderTemplate = (string) $schema[self::CFG_NEW_ORDER_TEMPLATE]['default'];
             $default = true;
         }
         if (empty($adminLoginTemplate)) {
-            $adminLoginTemplate = $this->getDefaultAdminLoginTemplate();
+            $adminLoginTemplate = (string) $schema[self::CFG_ADMIN_LOGIN_TEMPLATE]['default'];
             $default = true;
         }
         if (empty($newCustomerTemplate)) {
-            $newCustomerTemplate = $this->getDefaultNewCustomerTemplate();
+            $newCustomerTemplate = (string) $schema[self::CFG_NEW_CUSTOMER_TEMPLATE]['default'];
             $default = true;
         }
 

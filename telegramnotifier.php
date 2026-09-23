@@ -10,6 +10,7 @@ class TelegramNotifier extends Module
     private const CFG_NEW_ORDERS_CHAT_ID = 'TELEGRAMNOTIFY_NEW_ORDERS_CHAT_ID';
     private const CFG_ADMIN_LOGIN_CHAT_ID = 'TELEGRAMNOTIFY_ADMIN_LOGIN_CHAT_ID';
     private const CFG_NEW_CUSTOMER_CHAT_ID = 'TELEGRAMNOTIFY_NEW_CUSTOMER_CHAT_ID';
+    private const CFG_IP_GEO_ENDPOINT = 'TELEGRAMNOTIFY_IP_GEO_ENDPOINT';
     private const CFG_UPDATE_NOTIFICATIONS = 'TELEGRAMNOTIFY_UPDATE_NOTIFICATIONS';
     private const CFG_UPDATE_CHECK_INTERVAL = 'TELEGRAMNOTIFY_UPDATE_CHECK_INTERVAL';
     private const CFG_MAX_MESSAGES = 'TELEGRAMNOTIFY_MAX_MESSAGES';
@@ -29,7 +30,10 @@ class TelegramNotifier extends Module
             self::CFG_NEW_ORDERS_CHAT_ID => ['type' => 'string', 'default' => ''],
             self::CFG_ADMIN_LOGIN_CHAT_ID => ['type' => 'string', 'default' => ''],
             self::CFG_NEW_CUSTOMER_CHAT_ID => ['type' => 'string', 'default' => ''],
-
+            self::CFG_IP_GEO_ENDPOINT => [
+                'type' => 'string',
+                'default' => 'https://free.freeipapi.com/api/v1/json/{ip}',
+            ],
             self::CFG_UPDATE_NOTIFICATIONS => ['type' => 'bool', 'default' => true],
             self::CFG_UPDATE_CHECK_INTERVAL => ['type' => 'int', 'default' => 12], // hours
             self::CFG_MAX_MESSAGES => ['type' => 'int', 'default' => 5],
@@ -179,6 +183,7 @@ class TelegramNotifier extends Module
             $this->setConfigValue(self::CFG_NEW_ORDERS_CHAT_ID, '') &&
             $this->setConfigValue(self::CFG_ADMIN_LOGIN_CHAT_ID, '') &&
             $this->setConfigValue(self::CFG_NEW_CUSTOMER_CHAT_ID, '') &&
+            $this->setConfigValue(self::CFG_IP_GEO_ENDPOINT, 'https://free.freeipapi.com/api/v1/json/{ip}') &&
             $this->setConfigValue(self::CFG_UPDATE_NOTIFICATIONS, true) &&
             $this->setConfigValue(self::CFG_UPDATE_CHECK_INTERVAL, 12) &&
             $this->setConfigValue(self::CFG_MAX_MESSAGES, 5) &&
@@ -197,6 +202,7 @@ class TelegramNotifier extends Module
             $this->deleteConfigValue(self::CFG_NEW_ORDERS_CHAT_ID) &&
             $this->deleteConfigValue(self::CFG_ADMIN_LOGIN_CHAT_ID) &&
             $this->deleteConfigValue(self::CFG_NEW_CUSTOMER_CHAT_ID) &&
+            $this->deleteConfigValue(self::CFG_IP_GEO_ENDPOINT) &&
             $this->deleteConfigValue(self::CFG_UPDATE_NOTIFICATIONS) &&
             $this->deleteConfigValue(self::CFG_UPDATE_CHECK_INTERVAL) &&
             $this->deleteConfigValue(self::CFG_MAX_MESSAGES) &&
@@ -470,6 +476,7 @@ class TelegramNotifier extends Module
             $this->getFromCache(self::CFG_NEW_ORDERS_CHAT_ID),
             $this->getFromCache(self::CFG_ADMIN_LOGIN_CHAT_ID),
             $this->getFromCache(self::CFG_NEW_CUSTOMER_CHAT_ID),
+            $this->getFromCache(self::CFG_IP_GEO_ENDPOINT),
             $this->getFromCache(self::CFG_UPDATE_NOTIFICATIONS),
             $this->getFromCache(self::CFG_UPDATE_CHECK_INTERVAL),
             $maxMessages,
@@ -874,10 +881,23 @@ class TelegramNotifier extends Module
         return implode("\n", $parts);
     }
 
-    private function validateConfigurationData($botToken, $newOrdersChatId, $adminLoginChatId, $newCustomerChatId, $updateNotifications, $updateCheckInterval, $maxMessages, $maxRetries, $newOrderTemplate, $adminLoginTemplate, $newCustomerTemplate)
-    {
+    private function validateConfigurationData(
+        $botToken,
+        $newOrdersChatId,
+        $adminLoginChatId,
+        $newCustomerChatId,
+        $ipGeoEndpoint,
+        $updateNotifications,
+        $updateCheckInterval,
+        $maxMessages,
+        $maxRetries,
+        $newOrderTemplate,
+        $adminLoginTemplate,
+        $newCustomerTemplate
+    ) {
         $errors = [];
         $default = false;
+        $schema = $this->getConfigSchema();
 
         if (empty($botToken)) {
             $errors[] = $this->l('Bot Token is required.');
@@ -890,6 +910,15 @@ class TelegramNotifier extends Module
         $this->validateChatIds($newOrdersChatId, 'New Orders Notification Chat ID(s)', $errors);
         $this->validateChatIds($adminLoginChatId, 'Admin Login Notifications Chat ID(s)', $errors);
         $this->validateChatIds($newCustomerChatId, 'New Customer Registration Notifications Chat ID(s)', $errors);
+
+        $ipGeoEndpoint = trim((string) $ipGeoEndpoint);
+
+        if ($ipGeoEndpoint === '') {
+            $ipGeoEndpoint = (string) $schema[self::CFG_IP_GEO_ENDPOINT]['default'];
+            $default = true;
+        } elseif (strpos($ipGeoEndpoint, '{ip}') === false) {
+            $errors[] = $this->l('IP geolocation endpoint must contain {ip} placeholder.');
+        }
 
         if (!is_bool($updateNotifications)) {
             $errors[] = $this->l('Update Notifications must be a boolean value.');
@@ -928,6 +957,7 @@ class TelegramNotifier extends Module
             'newOrderTemplate' => $newOrderTemplate,
             'adminLoginTemplate' => $adminLoginTemplate,
             'newCustomerTemplate' => $newCustomerTemplate,
+            'ipGeoEndpoint' => $ipGeoEndpoint,
             'default' => $default
         ];
     }
@@ -1065,21 +1095,43 @@ class TelegramNotifier extends Module
 
     private function getCountryFromIP($ip)
     {
-        // SECURITY NOTE: Plain HTTP is used because ip-api.com requires a paid subscription for HTTPS access.
-        // MITM exposure is accepted here as these geolocation data points are non-critical and
-        // strictly validated via sanitizeExternalCountry to prevent any injection vectors.
-        $url = "http://ip-api.com/json/{$ip}";
+        $template = trim((string) $this->getFromCache(self::CFG_IP_GEO_ENDPOINT));
+
+        $url = str_replace('{ip}', rawurlencode($ip), $template);
+
         $response = $this->executeCurlRequest($url);
-        if ($response['error'] || $response['httpCode'] != 200) {
+
+        if ($response['error']) {
+            $this->logError('IP geolocation request failed: ' . $response['error']);
+            return 'Unknown';
+        }
+
+        if ($response['httpCode'] != 200) {
+            $this->logError('IP geolocation request failed: HTTP ' . $response['httpCode']);
             return 'Unknown';
         }
 
         $data = json_decode($response['result'], true);
-        if (!is_array($data) || !isset($data['country'])) {
+        if (!is_array($data)) {
+            $this->logError('IP geolocation endpoint returned invalid JSON response');
             return 'Unknown';
         }
 
-        return $this->sanitizeExternalCountry($data['country']);
+        // Try common country field names used by several providers.
+        $country = null;
+        if (isset($data['countryName']) && is_string($data['countryName'])) {
+            $country = $data['countryName']; // freeipapi.com style
+        } elseif (isset($data['country']) && is_string($data['country'])) {
+            $country = $data['country']; // ip-api.com, ipwho.is, etc.
+        } elseif (isset($data['country_name']) && is_string($data['country_name'])) {
+            $country = $data['country_name'];
+        }
+
+        if ($country === null || $country === '') {
+            return 'Unknown';
+        }
+
+        return $this->sanitizeExternalCountry($country);
     }
 
     private function getGenderName($id_gender)
@@ -1201,6 +1253,7 @@ class TelegramNotifier extends Module
             $newOrdersChatId = $getConfigValueFromForm(self::CFG_NEW_ORDERS_CHAT_ID);
             $adminLoginChatId = $getConfigValueFromForm(self::CFG_ADMIN_LOGIN_CHAT_ID);
             $newCustomerChatId = $getConfigValueFromForm(self::CFG_NEW_CUSTOMER_CHAT_ID);
+            $ipGeoEndpoint = $getConfigValueFromForm(self::CFG_IP_GEO_ENDPOINT);
             $updateNotifications = (bool) $getConfigValueFromForm(self::CFG_UPDATE_NOTIFICATIONS);
             $updateCheckInterval = $getConfigValueFromForm(self::CFG_UPDATE_CHECK_INTERVAL);
             $maxMessages = $getConfigValueFromForm(self::CFG_MAX_MESSAGES);
@@ -1214,6 +1267,7 @@ class TelegramNotifier extends Module
                 $newOrdersChatId,
                 $adminLoginChatId,
                 $newCustomerChatId,
+                $ipGeoEndpoint,
                 $updateNotifications,
                 $updateCheckInterval,
                 $maxMessages,
@@ -1228,6 +1282,7 @@ class TelegramNotifier extends Module
                 $this->setConfigValue(self::CFG_NEW_ORDERS_CHAT_ID, $newOrdersChatId);
                 $this->setConfigValue(self::CFG_ADMIN_LOGIN_CHAT_ID, $adminLoginChatId);
                 $this->setConfigValue(self::CFG_NEW_CUSTOMER_CHAT_ID, $newCustomerChatId);
+                $this->setConfigValue(self::CFG_IP_GEO_ENDPOINT, $validationResult['ipGeoEndpoint']);
                 $this->setConfigValue(self::CFG_UPDATE_NOTIFICATIONS, $updateNotifications);
                 $this->setConfigValue(self::CFG_UPDATE_CHECK_INTERVAL, $updateCheckInterval);
                 $this->setConfigValue(self::CFG_MAX_MESSAGES, $maxMessages);
@@ -1238,7 +1293,7 @@ class TelegramNotifier extends Module
 
                 $output .= $this->displayConfirmation($this->l('Settings updated'));
                 if ($validationResult['default']) {
-                    $output .= $this->displayWarning($this->l('One or more templates were empty. Using default templates.'));
+                    $output .= $this->displayWarning($this->l('One or more templates or IP geolocation settings were empty. Using default values.'));
                 }
             } else {
                 foreach ($validationResult as $error) {
@@ -1301,6 +1356,17 @@ class TelegramNotifier extends Module
                         'size' => 50,
                         'required' => false,
                         'desc' => $this->l('Enter Chat IDs to receive notifications for new customer registrations. Use the same format as above.')
+                    ],
+                    [
+                        'type' => 'text',
+                        'label' => $this->l('🌐 IP geolocation API endpoint'),
+                        'name' => self::CFG_IP_GEO_ENDPOINT,
+                        'size' => 80,
+                        'required' => false,
+                        'desc' => $this->l(
+                            'URL template for resolving the customer IP to a country. Use {ip} as placeholder. ' .
+                            'Default: https://free.freeipapi.com/api/v1/json/{ip}.'
+                        ),
                     ],
                     [
                         'type' => 'switch',

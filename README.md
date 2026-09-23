@@ -94,15 +94,23 @@ After installing TelegramNotifier, you'll enter the module configuration and enc
    - If you have a courier, you can add their chat ID to the **New Orders Notifications** (to avoid sending them unnecessary notifications).
    - You can add a sysadmin's chat ID to all types of notifications.
 
-3. **Telegram Update Notifications:**
+3. **IP Geolocation Endpoint (Planned for v1.0.11+; currently hardcoded to ip-api.com in v1.0.10):**
+
+   - This setting controls which external service is used to resolve the customer's IP address for the `{country}` placeholder.
+   - By default, the module uses `https://free.freeipapi.com/api/v1/json/{ip}` (HTTPS, completely free, no API key required, and allowed for commercial use).
+   - You can change this to any alternative provider that returns a JSON response containing a `countryName` or `country` field (for example, `https://ipwho.is/{ip}` or your own custom endpoint).
+   - If your provider requires authorization, you can include API keys directly in the URL query string or path (e.g., `https://api.example.com/lookup?key=YOUR_TOKEN&ip={ip}`).
+   - **Note:** The `{ip}` placeholder in the URL is strictly required.
+
+4. **Telegram Update Notifications:**
 
    - Stay informed about new updates to the TelegramNotifier module directly through Telegram messages.
 
-4. **Update Check Interval (hours):**
+5. **Update Check Interval (hours):**
 
    - Configure how often the module checks for new updates. Default is 12 hours.
 
-5. **Max Messages per Action:**
+6. **Max Messages per Action:**
 
    - This setting allows you to control the maximum number of messages sent per action.
    - In most cases, you don't need to change this value.
@@ -111,7 +119,7 @@ After installing TelegramNotifier, you'll enter the module configuration and enc
    - **Important:** If you reduce this value, make sure the most important information appears first in your message templates (like order reference, customer name, total paid). The default templates are already optimized with critical data at the top.
    - Set this value to **0** for unlimited messages per action.
 
-6. **Max Retry Attempts:**
+7. **Max Retry Attempts:**
 
    - Number of retry attempts if sending fails.
    - Set to **0** to disable retries (**recommended** for dedicated hosting with a stable network).
@@ -124,7 +132,7 @@ After installing TelegramNotifier, you'll enter the module configuration and enc
 
      This can help manage Telegram's rate limits when multiple notifications are sent simultaneously. Telegram applies rate limits per chat, not per bot token.
 
-7. **Message Templates:**
+8. **Message Templates:**
    Customize the notification messages using available placeholders:
 
    **New Order Notification Template:**
@@ -164,7 +172,7 @@ After installing TelegramNotifier, you'll enter the module configuration and enc
    - `{gender}`: Customer's gender 👫
    - `{newsletter}`: Whether the customer subscribed to the newsletter 📰
 
-8. **Final Step:**
+9. **Final Step:**
    Save your settings and use the **"Test Message"** button to verify the configuration.
 
    **Note:** The test message will only be sent to the chat ID(s) specified in the **New Orders Notifications** field.
@@ -215,6 +223,10 @@ This will disable the module and should restore your ability to access the admin
 ### ⚠️ Important Note
 
 Remember to always test your configuration thoroughly, especially when setting up admin login notifications, to ensure you don't accidentally lock yourself out of the admin panel.
+
+## ⚖️ Legal / Data Protection Notice
+
+This module can process and send customer personal data (for example name, email, phone, address, IP address and order details) to third‑party services such as Telegram (when you use placeholders like `{customer_name}`, `{customer_email}`, `{phone_number}`, `{ip_address}`, etc.) and IP geolocation providers (when you use the `{country}` placeholder). As the shop owner / data controller you are responsible for complying with applicable data protection laws (e.g. GDPR or local privacy laws) and for updating your privacy policy / consent text so that customers are informed that their data may be transferred to such third-parties. If you do not want to send personal data to these services, simply remove these placeholders from your templates.
 
 ## 🆘 Support
 

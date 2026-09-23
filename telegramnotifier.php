@@ -502,7 +502,7 @@ class TelegramNotifier extends Module
 
         foreach ($chatIdsArray as $chatId) {
             foreach ($messageParts as $part) {
-                $urls[] = "https://api.telegram.org/bot" . urlencode($botToken) . "/sendMessage";
+                $urls[] = "https://api.telegram.org/bot" . rawurlencode($botToken) . "/sendMessage";
                 $postData[] = [
                     'chat_id' => $chatId,
                     'text' => $part,

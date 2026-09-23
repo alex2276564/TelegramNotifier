@@ -58,10 +58,10 @@ After installing TelegramNotifier, you'll enter the module configuration and enc
    - You can enter multiple chat IDs separated by commas (e.g., `123456789, -987654321, -1001234567890`).
    - You can enter up to **30** chat IDs per notification type (**Telegram API limit**).
 
-   **Other Methods (Groups and Channels):**
+   **Other Methods (Groups and Channels — Skippable for First Setup):**
    If you want to experiment with team notifications or broadcasts, you can also use:
 
-   - **Group Chat Method:**
+   - **Group Chat Method (Optional — Skip if first setup):**
 
      1. Add the bot to the group.
      2. Send any message in the group with the bot (like "Hello").
@@ -71,7 +71,7 @@ After installing TelegramNotifier, you'll enter the module configuration and enc
 
      4. Add this chat ID to your configuration.
 
-   - **Channel Method:**
+   - **Channel Method (Optional — Skip if first setup):**
 
      1. Add the bot as an administrator of the channel.
      2. Open **[Web Telegram](https://web.telegram.org/a/)** and navigate to the channel.

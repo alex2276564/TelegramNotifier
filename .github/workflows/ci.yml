@@ -386,7 +386,6 @@ jobs:
     timeout-minutes: 20
     needs:
       [
-        lint-actions,
         lint-renovate,
         lint-php,
         lint-links,
@@ -435,7 +434,6 @@ jobs:
     timeout-minutes: 20
     needs:
       [
-        lint-actions,
         lint-renovate,
         lint-php,
         lint-links,

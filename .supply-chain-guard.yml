@@ -13,9 +13,6 @@ suppress:
   - rule: GHA_OIDC_WRITE_PERM
     reason: "Required for SLSA provenance (Sigstore/OIDC signing)"
     path: .github/workflows/release.yml
-  - rule: GHA_ARTIFACT_DOWNLOAD
-    reason: "Artifact is produced by the SLSA reusable workflow in this run and only treated as data, not executed."
-    path: .github/workflows/release.yml
   - rule: WORKFLOW_SECRET_TO_UPLOAD_PATH
     reason: "Secrets are already scoped to the minimum set of steps; outbound calls are limited to trusted endpoints."
     path: .github/workflows/ci.yml

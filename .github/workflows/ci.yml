@@ -203,6 +203,7 @@ jobs:
           semgrep scan \
             --pro \
             --config auto \
+            --config "p/php" \
             --config "p/owasp-top-ten" \
             --config "p/secrets" \
             --config "p/github-actions" \

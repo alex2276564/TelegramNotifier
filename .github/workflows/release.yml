@@ -14,62 +14,6 @@ env:
   MODULE_DIR: telegramnotifier
   ZIP_NAME: telegramnotifier.zip
 
-# =============================================================================
-# Security model for GitHub Actions: action versioning & runner egress
-#
-# RATIONALE
-# ---------
-# This is an open-source project maintained by a single developer.
-# Threat model (for CI / GitHub Actions specifically):
-# - Third-party GitHub Actions and build tools may eventually be compromised.
-# - There is no capacity to manually review SHA-pinned action diffs on every
-#   update.
-# - Therefore, the primary defence against malicious GitHub Actions is
-#   runtime monitoring and egress control on the runner, not version pinning.
-#
-# ACTION VERSIONING
-# -----------------
-# All third-party actions are referenced using @main / @master or the latest
-# convenient semver tag. We do NOT treat tag pinning as a strong security
-# control in this repository.
-#
-# SHA pinning is intentionally NOT used:
-# - It only provides strong guarantees when combined with manual review of
-#   every upstream commit, which this project cannot sustain.
-# - Without that review discipline, SHA pins can still point to malicious
-#   code that was present before the pin was taken, and they add maintenance
-#   overhead without realistic benefit here.
-#
-# Semver/tag pinning is also NOT enforced as a primary control:
-# - Tags on GitHub are mutable; recent supply-chain incidents (e.g. compromised
-#   actions overwriting historical tags) have shown that tag pinning alone does
-#   not reliably prevent malicious updates.
-#
-# Primary CI / GitHub Actions supply-chain controls:
-# - step-security/harden-runner is used in every job to protect the CI runner:
-#   * monitors outbound network, file, and process activity at runtime;
-#   * enforces a Global Block List of known-malicious endpoints maintained
-#     by StepSecurity's SOC;
-#   * supports per-job egress allowlists in block mode to limit exfiltration
-#     impact if an action or dependency is compromised.
-#
-# EGRESS POLICY (step-security/harden-runner)
-# ------------------------------------------
-# High-risk jobs (write permissions / secrets / CD & publishing):
-# - egress-policy: block with an explicit allowed-endpoints allowlist.
-#   Rationale: limits the blast radius if an action or dependency is
-#   compromised and tries to exfiltrate data.
-#
-# Low-risk jobs (read-only, no secrets):
-# - egress-policy: audit.
-#   Rationale: scanning tools may legitimately contact varying endpoints
-#   across versions; strict blocking would require frequent maintenance
-#   for little benefit when no sensitive credentials are present.
-#
-# See Harden-Runner docs:
-#   https://docs.stepsecurity.io/harden-runner
-# =============================================================================
-
 on:
   workflow_dispatch:
     inputs:
@@ -85,13 +29,27 @@ on:
 permissions:
   contents: read
 
+# This workflow publishes a release, so an in-progress run must not be
+# canceled by a newer one (cancel-in-progress: false). The "-caller" suffix
+# keeps this group distinct from any group the SLSA reusable workflow below
+# builds from "${{ github.workflow }}" on its own side.
+concurrency:
+  group: ${{ github.workflow }}-caller
+  cancel-in-progress: false
+  queue: max
+
+defaults:
+  run:
+    shell: bash
+
 jobs:
   # ================================================================
   # 🏗️ BUILD: build ZIP and compute SHA-256
   # ================================================================
   build:
     name: 🏗️ Build module
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
 
     outputs:
       zip_file: ${{ steps.zip.outputs.zip_file }}
@@ -101,12 +59,12 @@ jobs:
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@main
+        uses: step-security/harden-runner@v2.22.1
         with:
           egress-policy: audit
 
       - name: Checkout repository
-        uses: actions/checkout@main
+        uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
 
@@ -229,7 +187,7 @@ jobs:
           echo "subjects_b64=$SUBJECTS_B64" >> "$GITHUB_OUTPUT"
 
       - name: Upload ZIP as workflow artifact
-        uses: actions/upload-artifact@main
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: module-zip
           path: ${{ steps.zip.outputs.zip_file }}
@@ -252,8 +210,8 @@ jobs:
 
     permissions:
       actions: read
-      id-token: write   # required for Sigstore/OIDC signing
-      contents: write   # required to upload provenance as artifact
+      id-token: write # required for Sigstore/OIDC signing
+      contents: write # required to upload provenance as artifact
 
     # SLSA generic generator: MUST be pinned to exact semver tag (vX.Y.Z)
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
@@ -267,25 +225,26 @@ jobs:
   release:
     name: 🚀 GitHub Release
     needs: [build, provenance]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
 
     permissions:
       contents: write
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@main
+        uses: step-security/harden-runner@v2.22.1
         with:
           egress-policy: audit
 
       - name: Download module ZIP
-        uses: actions/download-artifact@main
+        uses: actions/download-artifact@v8.0.2
         with:
           name: module-zip
           path: dist
 
       - name: Download SLSA provenance artifact
-        uses: actions/download-artifact@main
+        uses: actions/download-artifact@v8.0.2
         with:
           name: ${{ needs.provenance.outputs['provenance-name'] }}
           path: slsa
@@ -324,7 +283,7 @@ jobs:
         # zizmor: softprops/action-gh-release is intentionally used over
         # `gh release` CLI — it provides atomic asset upload, glob support,
         # and release update semantics not easily replicated with the CLI.
-        uses: softprops/action-gh-release@master # zizmor: ignore[superfluous-actions]
+        uses: softprops/action-gh-release@v3.0.3 # zizmor: ignore[superfluous-actions]
         with:
           # No automatic "v" prefix: the tag will be exactly what you type
           # in the "release_version" input (e.g. "1.0.9").

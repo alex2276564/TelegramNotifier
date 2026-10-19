@@ -1,8 +1,11 @@
 AUTONOMY MODE:
 Dynamically analyze the repo structure and autonomously skip all non-production files, test suites, build artifacts, and package caches (like gradle, node_modules, build, target). Focus 100% of reasoning exclusively on core production source code and active endpoints.
 
-RULES:
+GENERIC RULES:
 1. Always check README.md and SECURITY.md first at the beginning of the execution.
 2. Before reporting any vulnerability or raising an alert, cross-reference your findings with SECURITY.md to verify if the issue is already documented, explicitly allowed, or handled by existing security policies.
 3. FILTRATION OF INVALID PRE-REQUISITES: Evaluate every issue strictly within the context of achievable attacker access, discarding findings as false positives if their execution depends on absurd initial prerequisites like pre-existing root/admin OS privileges, physical infrastructure access, or full server filesystem control from the very start.
 
+PROJECT SPECIFIC RULES:
+1. Verify that every directory of the final release build contains an index.php file with an "exit;"/"return;" guard, preventing directory listing. Reproduce the build process exactly as defined in .github/workflows/release.yml, then inspect the resulting archive/folder tree (root and all subdirectories, including any newly added ones such as upgrade/) to confirm none are missing this file.
+2. Verify that every production PHP file included in the release build contains the `if (!defined('_PS_VERSION_')) { exit; }` guard at the top, with the sole exception of index.php files (which already unconditionally exit and contain no module logic).

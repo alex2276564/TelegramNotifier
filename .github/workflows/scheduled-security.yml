@@ -1,61 +1,5 @@
 name: Scheduled Security Scan
 
-# =============================================================================
-# Security model for GitHub Actions: action versioning & runner egress
-#
-# RATIONALE
-# ---------
-# This is an open-source project maintained by a single developer.
-# Threat model (for CI / GitHub Actions specifically):
-# - Third-party GitHub Actions and build tools may eventually be compromised.
-# - There is no capacity to manually review SHA-pinned action diffs on every
-#   update.
-# - Therefore, the primary defence against malicious GitHub Actions is
-#   runtime monitoring and egress control on the runner, not version pinning.
-#
-# ACTION VERSIONING
-# -----------------
-# All third-party actions are referenced using @main / @master or the latest
-# convenient semver tag. We do NOT treat tag pinning as a strong security
-# control in this repository.
-#
-# SHA pinning is intentionally NOT used:
-# - It only provides strong guarantees when combined with manual review of
-#   every upstream commit, which this project cannot sustain.
-# - Without that review discipline, SHA pins can still point to malicious
-#   code that was present before the pin was taken, and they add maintenance
-#   overhead without realistic benefit here.
-#
-# Semver/tag pinning is also NOT enforced as a primary control:
-# - Tags on GitHub are mutable; recent supply-chain incidents (e.g. compromised
-#   actions overwriting historical tags) have shown that tag pinning alone does
-#   not reliably prevent malicious updates.
-#
-# Primary CI / GitHub Actions supply-chain controls:
-# - step-security/harden-runner is used in every job to protect the CI runner:
-#   * monitors outbound network, file, and process activity at runtime;
-#   * enforces a Global Block List of known-malicious endpoints maintained
-#     by StepSecurity's SOC;
-#   * supports per-job egress allowlists in block mode to limit exfiltration
-#     impact if an action or dependency is compromised.
-#
-# EGRESS POLICY (step-security/harden-runner)
-# ------------------------------------------
-# High-risk jobs (write permissions / secrets / CD & publishing):
-# - egress-policy: block with an explicit allowed-endpoints allowlist.
-#   Rationale: limits the blast radius if an action or dependency is
-#   compromised and tries to exfiltrate data.
-#
-# Low-risk jobs (read-only, no secrets):
-# - egress-policy: audit.
-#   Rationale: scanning tools may legitimately contact varying endpoints
-#   across versions; strict blocking would require frequent maintenance
-#   for little benefit when no sensitive credentials are present.
-#
-# See Harden-Runner docs:
-#   https://docs.stepsecurity.io/harden-runner
-# =============================================================================
-
 on:
   schedule:
     - cron: "0 4 * * *" # every day at 4:00 UTC
@@ -105,36 +49,50 @@ on:
 permissions:
   contents: read
 
+# Scheduled runs share one group so they queue instead of overlapping.
+# Manual runs fold their inputs into the group so that two dispatches with
+# different parameters do not cancel/replace each other. The "-caller"
+# suffix keeps this group distinct from any group a called reusable
+# workflow (e.g. the OSV scan below) builds from "${{ github.workflow }}".
+concurrency:
+  group: >-
+    ${{ github.workflow }}-caller-${{ github.event_name }}-${{ github.event.inputs.ai_model || 'no-model' }}-${{ github.event.inputs.scan_mode || 'no-scan-mode' }}-${{ github.event.inputs.scope_mode || 'no-scope' }}
+  cancel-in-progress: false
+  queue: max
+
+defaults:
+  run:
+    shell: bash
+
 jobs:
   security-scan-semgrep:
     name: 🔐 Security Scan Semgrep
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: security-scans
 
     permissions:
       contents: read
       security-events: write
 
-    env:
-      SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
-
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@main
+        uses: step-security/harden-runner@v2.22.1
         with:
           egress-policy: audit
 
       - name: Checkout repository
-        uses: actions/checkout@main
+        uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@main
+        uses: actions/setup-python@v7.0.0
         with:
           python-version: "3.x"
 
       - name: Setup Socket Firewall
-        uses: socketdev/action@main
+        uses: socketdev/action@v1.3.2
         with:
           mode: firewall-free
 
@@ -142,9 +100,15 @@ jobs:
         run: sfw pip install semgrep
 
       - name: Setup Semgrep Pro Engine via Socket Firewall
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
         run: sfw semgrep install-semgrep-pro
 
+      # Exclude mutable action tag rule because Semgrep does not support the modern
+      # actions.lockfile mechanism yet.
       - name: Run Semgrep
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
         run: |
           semgrep scan \
             --pro \
@@ -154,50 +118,51 @@ jobs:
             --config "p/github-actions" \
             --config "p/supply-chain" \
             --exclude-rule "yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag" \
-            --sarif --output semgrep.sarif \
+            --sarif-output semgrep.sarif \
             --error
 
       - name: Upload results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v4
-        if: always()
+        uses: github/codeql-action/upload-sarif@v4.39.0
+        if: ${{ always() }}
         with:
           sarif_file: semgrep.sarif
 
   security-scan-strix:
     name: 🔐 Security Scan Strix
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
 
-    if: github.event_name == 'workflow_dispatch'
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+
+    environment: ai
 
     permissions:
       contents: read
       actions: read
 
-    env:
-      STRIX_LLM: ${{ github.event.inputs.ai_model }}
-      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-      LLM_TIMEOUT: ${{ github.event.inputs.llm_timeout }}
-      STRIX_LLM_MAX_RETRIES: ${{ github.event.inputs.max_retries }}
-
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@main
+        uses: step-security/harden-runner@v2.22.1
         with:
           egress-policy: audit
 
       - name: Checkout repository
-        uses: actions/checkout@main
+        uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 0
 
       - name: Install Strix
-        # nosemgrep: yaml.github-actions.security.gha-curl-pipe-shell.gha-curl-pipe-shell
-        run: |
-          curl -sSL https://strix.ai/install | bash
+        run: | # jactionlint ignore=unverified-download
+          curl -sSL -o install_strix.sh https://strix.ai/install
+          bash install_strix.sh
 
       - name: Run Code Analysis via ${{ env.STRIX_LLM }}
         env:
+          LLM_API_KEY: ${{ secrets.OPENROUTER_TOKEN_FREE_1 }}
+          STRIX_LLM: ${{ github.event.inputs.ai_model }}
+          LLM_TIMEOUT: ${{ github.event.inputs.llm_timeout }}
+          STRIX_LLM_MAX_RETRIES: ${{ github.event.inputs.max_retries }}
           STRIX_SCAN_MODE: ${{ github.event.inputs.scan_mode }}
           STRIX_SCOPE_MODE: ${{ github.event.inputs.scope_mode }}
         run: |
@@ -207,27 +172,80 @@ jobs:
             --scope-mode "$STRIX_SCOPE_MODE" \
             --instruction-file ".github/strix/rules.txt"
 
-  security-scan-zizmor:
-    name: 🔐 GitHub Actions Security (zizmor)
-    runs-on: ubuntu-latest
+  security-scan-supply-chain-guard:
+    name: 🔐 Security Scan supply-chain-guard
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
 
     permissions:
       contents: read
-      actions: read
-      security-events: write
+      pull-requests: write
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@main
+        uses: step-security/harden-runner@v2.22.1
         with:
           egress-policy: audit
 
       - name: Checkout repository
-        uses: actions/checkout@main
+        uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
 
-      - name: Run zizmor 🌈
-        uses: zizmorcore/zizmor-action@main
+      - uses: homeofe/supply-chain-guard@v6.5.9
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          fail-on: low
+          comment-on-pr: true
+          refresh-catalog: true
+          exclude-rules: POLICY_SUPPRESSED_SEVERE
+
+  security-scan-jactionlint:
+    name: 🔐 Security Scan jactionlint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2.22.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run jactionlint (pedantic + online + strict exit)
+        uses: jdx/jactionlint@v2.2.0
+        with:
+          profile: pedantic
+          online: strict
+          strict-exit: true
+          advanced-security: true
+
+  security-scan-gh-actions-lockfile:
+    name: 🔐 Security Scan GitHub Actions Lockfile
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2.22.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Verify GitHub Actions lockfile
+        run: |
+          gh extension install github/gh-actions-lock
+          gh actions-lock --verify
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

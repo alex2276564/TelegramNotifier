@@ -19,24 +19,24 @@
 //    - Dev/test dependencies:
 //        • grouped into a single PR (less noise)
 //
+// ⏰ Execution / runtime
+// ----------------------
+// Renovate is expected to run at least once per day (e.g. via cron on a VPS
+// or a scheduled CI job), regardless of the global "schedule" setting below.
+//
+// Reason:
+//   • "schedule" only controls when *regular* dependency updates are allowed
+//     to create/update PRs.
+//   • Security-related PRs (vulnerabilityAlerts, OSV, etc.) ignore "schedule",
+//     but they can only be created when Renovate actually runs.
+//   • Daily executions ensure security fixes are raised as soon as possible,
+//     while normal updates can still be limited to specific days.
+//
 // 🔧 To adapt for other projects:
 //    1. Update enabledManagers (npm, composer, pip, etc.)
 //    2. Adjust matchManagers in packageRules
 //    3. Customize project-specific ignore rules
 // ================================================================
-// ⚠️ SECURITY NOTE
-// -----------------
-// Regardless of which schedule mode you choose below (Option 1 / Option 2),
-// it's strongly recommended to run Renovate at least once per day
-// (via cron or CI).
-//
-// Reason:
-//   • vulnerabilityAlerts PRs ignore Renovate's "schedule" filter,
-//     but they are only created when the Renovate process actually runs.
-//   • If Renovate runs only once per week, security fixes (based on
-//     GitHub Dependabot alerts, OSV, etc.) can be delayed by up to a week.
-//   • For Internet‑facing or security‑sensitive projects, a daily
-//     Renovate run is a good baseline.
 
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
@@ -52,211 +52,47 @@
   ],
 
   // ================================================================
-  // ⏰ SCHEDULE & TIMING
+  // 🔒 GITHUB ACTIONS LOCKFILE (actions.lock)
+  // ================================================================
+  // Renovate maintains .github/workflows/actions.lock automatically via
+  // the gh-actions-lock GitHub CLI extension. By default Renovate pins a
+  // specific version of that extension for deterministic updates; we
+  // override this to always use the latest extension release instead.
+  // ================================================================
+  "constraints": {
+    "ghActionsLock": ""   // empty string = always use latest gh-actions-lock release
+  },
+
+  // ================================================================
+  // ⏰ GLOBAL SCHEDULE
   // ================================================================
   // Controls when Renovate creates PRs for dependency updates.
-  //
-  // 💡 KEY CONCEPT: Day-only schedules vs Time-specific schedules
-  // ----------------------------------------------------------------
-  // Day-only (recommended):   "on monday", "every weekend"
-  // Time-specific (complex):  "before 6am on monday", "after 10pm"
-  //
-  // ⚠️ WHY AVOID time-specific schedules?
-  // ----------------------------------------------------------------
-  // Time-based schedules create synchronization issues:
-  //
-  // 1. Timezone complexity:
-  //    - Your VPS cron runs in timezone A (e.g., UTC)
-  //    - GitHub Actions runs in timezone B (e.g., America/New_York)
-  //    - Mend.io cloud runs in unknown timezone C
-  //    - Result: Same config behaves differently everywhere!
-  //
-  // 2. Clock drift and DST:
-  //    - System clocks may be slightly off
-  //    - Daylight Saving Time changes offset
-  //    - Edge cases near midnight (is it Monday or Tuesday?)
-  //
-  // 3. Maintenance burden:
-  //    - Moving servers → recalculate time offsets
-  //    - Adding CI environments → debug schedule mismatches
-  //    - Time-specific logic is hard to reason about
-  //
-  // ✅ SOLUTION: Two-level scheduling architecture
-  // ----------------------------------------------------------------
-  // Separate WHEN (cron) from WHICH DAYS (renovate.json):
-  //
-  //   Level 1 - Cron (VPS/CI):
-  //     Controls execution frequency (when Renovate process starts)
-  //     Example: 0 1 * * * = daily at 01:00
-  //
-  //   Level 2 - Schedule (renovate.json):
-  //     Controls PR creation days (which days PRs are allowed)
-  //     Example: "on monday" = only Mondays (any time of day)
-  //
-  // Benefits:
-  //   • No time synchronization needed (only day matters)
-  //   • Same config works across all environments
-  //   • Easy to understand and maintain
-  //
-  // ================================================================
-  // 📋 OPTION 1: Universal (Recommended for flexibility)
-  // ================================================================
-  // Best for: Multiple repos with different schedules
-  //
-  // Setup:
-  // ------
-  // VPS Cron (run Renovate daily):
-  //   0 1 * * * /opt/renovate/run-renovate.sh
-  //
-  // renovate.json (filter which days to create PRs):
-  //   "schedule": ["on monday"]  ← This setting (day-based)
-  //
-  // How it works:
-  // -------------
-  // • Renovate runs:  7 times/week (cron: every day at 01:00)
-  // • PRs created:    1 time/week (schedule: Monday only)
-  // • Wasted runs:    6/week (Renovate exits early on non-Monday)
-  //
-  // ✅ Pros:
-  //   • Universal: Works on VPS, GitHub Actions, GitLab CI, Mend.io
-  //   • Flexible: Different repos can use different days
-  //     - Repo A: "on monday"    → PRs on Monday
-  //     - Repo B: "on wednesday" → PRs on Wednesday
-  //     - All use same cron (daily), different schedules filter
-  //   • No timezone issues: "on monday" matches any time on Monday
-  //   • Add/remove repos: No cron changes needed
-  //
-  // ⚠️ Cons:
-  //   • Resource usage: Renovate starts 6 extra times (does nothing)
-  //   • Minimal impact: Each wasted run takes ~5-10 seconds
-  //
-  // 💡 TL;DR:
-  // Run Renovate daily via cron, let renovate.json filter days.
-  // You can deploy multiple Renovate instances across different
-  // servers/CI systems without worrying about time synchronization.
-  // Each repo's schedule is self-contained and portable.
-  //
-  // ================================================================
-  // 📋 OPTION 2: Optimized (Recommended for single schedule)
-  // ================================================================
-  // Best for: All repos update on same day, want to save resources
-  //
-  // ⚠️  WARNING: Security trade-off
-  // ----------------------------------------------------------------
-  // This option runs Renovate less frequently (e.g., only on Mondays).
-  // While vulnerabilityAlerts bypass the schedule restriction, they
-  // can only be created when Renovate is actually running.
-  //
-  // Security implications:
-  //   • CVE published on Tuesday → not detected until next Monday
-  //   • Vulnerability window: up to 6-7 days
-  //   • Acceptable ONLY for:
-  //     - Internal/private applications (not internet-facing)
-  //     - Development/testing environments
-  //     - Applications where security is not critical
-  //
-  // ❌ DO NOT USE for:
-  //   • Public-facing web applications
-  //   • Production systems handling sensitive data
-  //   • Applications exposed to the internet
-  //   • Any security-critical infrastructure
-  //
-  // If security is important, use OPTION 1 (daily execution) instead.
-  // ----------------------------------------------------------------
-  //
-  // Setup:
-  // ------
-  // VPS Cron (run Renovate only on Monday):
-  //   0 1 * * 1 /opt/renovate/run-renovate.sh
-  //   #       ↑
-  //   #       └─ 1 = Monday (0=Sun, 1=Mon, ..., 6=Sat)
-  //
-  // renovate.json (allow PRs any time):
-  //   "schedule": ["at any time"]  # or omit entirely (default)
-  //
-  // How it works:
-  // -------------
-  // • Renovate runs:  1 time/week (cron: Monday only)
-  // • PRs created:    1 time/week (schedule: always allowed)
-  // • Wasted runs:    0/week (runs only when needed)
-  // • Security fixes: Delayed up to 6-7 days ⚠️
-  //
-  // ✅ Pros:
-  //   • Efficient: No wasted Renovate executions
-  //   • Simple: One schedule to maintain (in cron)
-  //   • Resource-friendly: VPS not taxed on unused days
-  //
-  // ⚠️ Cons:
-  //   • Security risk: Vulnerabilities detected only once per week
-  //   • Less flexible: All repos must use same day
-  //     - If you want Repo B on Wednesday → must add second cron job
-  //   • Portability: Moving to different CI requires cron reconfiguration
-  //   • Multi-environment: Harder to sync if using VPS + GitHub Actions
-  //
-  // 💡 TL;DR:
-  // Control schedule entirely via cron, renovate.json has no day filter.
-  // More efficient but LESS SECURE. Only use for non-critical applications.
-  // For production systems, use OPTION 1 with daily cron execution.
-  // ================================================================
-  // 🎯 SCHEDULE SYNTAX REFERENCE
-  // ================================================================
-  // Common patterns (day-based, timezone-safe):
-  // -------------------------------------------
-  // "at any time"       → No filtering (always allowed)
-  // "on monday"         → Any time Monday (00:00-23:59 in any TZ)
-  // "on friday"         → Any time Friday
-  // "every weekend"     → Saturday and Sunday
-  // "every weekday"     → Monday through Friday
-  //
-  // Time-specific patterns (avoid unless necessary):
-  // ------------------------------------------------
-  // "before 6am on monday"     → ⚠️ Timezone-dependent
-  // "after 10pm every weekday" → ⚠️ Complex to synchronize
-  // ================================================================
 
   "schedule": [
-    "on monday"  // OPTION 1: Day-only schedule (timezone-safe, portable)
+    "on monday"
   ],
-
-  "timezone": "UTC",  // Reference timezone for schedule string parsing
-                      // Note: For day-only schedules like "on monday",
-                      // timezone setting has minimal effect (day boundaries
-                      // are fuzzy). Mainly matters for time-specific schedules.
 
   // ================================================================
   // 🔒 LOCK FILE MAINTENANCE
   // ================================================================
-  // Periodic refresh of lock files without changing manifests.
+  // Periodically refresh lock files without changing manifests.
   //
-  // What it does:
-  //   • Deletes lock file(s) and regenerates them using the package manager
-  //   • Updates ALL transitive dependencies to the latest compatible versions
-  //   • Manifest files (build.gradle, package.json, etc.) remain unchanged
-  //   • Creates a dedicated PR that contains only lock file changes
+  // Scheduling model:
+  //   • The top-level "schedule" (e.g. ["on monday"]) restricts when
+  //     Renovate is allowed to create/update PRs in general.
+  //   • Local "schedule": ["at any time"] here is intentionally
+  //     non-restrictive, so we don't add extra time-of-day windows.
   //
-  // Safety notes:
-  //   • Lock file maintenance never goes beyond the version ranges
-  //     defined in your manifests.
-  //       Example:
-  //         "^1.2.3" → may update to the latest 1.x.x, but never to 2.x.x.
-  //   • Even though these PRs are not split by patch/minor/major,
-  //     major upgrades normally cannot happen until you relax the ranges
-  //     in the manifest itself.
-  //
-  // Scheduling:
-  //   • The top-level "schedule" (e.g. ["on monday"]) restricts ALL update
-  //     types (regular dependency updates, lock file maintenance, etc.),
-  //     so Renovate will create/update branches and PRs only when it matches.
-  //   • Here we set "schedule": ["at any time"] to override the local default
-  //     "before 4am on monday" and avoid conflicting schedules.
-  //     Effective behavior:
-  //       → lockFileMaintenance runs whenever the top-level schedule allows it.
-  //         (Global and local schedules are combined with AND conditions, not OR.)
+  // Global + local schedules are combined with logical AND:
+  //   → Top-level: restricts which days/periods are allowed overall.
+  //   → Local:     "at any time" (no extra restriction).
+  //   → Result:    lockFileMaintenance follows the same days as the
+  //                global schedule, at any time of those days.
   // ================================================================
   "lockFileMaintenance": {
     "enabled": true,
     "schedule": [
-      "at any time" // Make local schedule non-restrictive so only the global schedule matters (AND conditions, not OR).
+      "at any time" // Local schedule is non-restrictive; only the global schedule really limits when it runs (AND conditions, not OR).
     ],
     "automerge": true,
     "commitMessagePrefix": "[Lockfile] "
@@ -466,14 +302,6 @@
     // ================================================================
 
     {
-      "description": "💬 Gradle: custom commit message prefix",
-      "matchManagers": ["gradle", "gradle-wrapper"],
-      "commitMessagePrefix": "[Gradle] ",
-      "semanticCommits": "disabled",
-      // Example: "[Gradle] Update dependency com.google.guava:guava to v32.0.0"
-    },
-
-    {
       "description": "💬 GitHub Actions: custom commit message prefix",
       "matchManagers": ["github-actions"],
       "commitMessagePrefix": "[GitHub Actions] ",
@@ -492,21 +320,42 @@
     //    - Group related updates
     // ================================================================
 
+    {
+      "description": "🛠️ Temporarily skip umbrelladocs/action-linkspector v1.5.5 (broken release)",
+      "matchManagers": ["github-actions"],
+      "matchPackageNames": [
+        "umbrelladocs/action-linkspector"
+      ],
+      "allowedVersions": "!/^v?1\\.5\\.5$/"
+    },
+    {
+      "description": "🛡️ Project-specific: ignore MAJOR updates for net.kyori:adventure-text-minimessage",
+      "matchManagers": ["gradle"],
+      "matchPackageNames": [
+        "net.kyori:adventure-text-minimessage"
+      ],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+      // Allow patch/minor updates, but never propose major (v5+) because it
+      // raises Java baseline and this project only uses v4 via reflection.
+    }
   ],
 
   // ================================================================
   // 🔐 VULNERABILITY ALERTS
   // ================================================================
-  // GitHub Security Advisories / Dependabot alerts integration.
+  // Dedicated PRs for security fixes.
   // Renovate reads GitHub vulnerability alerts and raises dedicated
   // security-fix PRs.
   //
   // Behavior:
-  //   • Ignores global limits like prConcurrentLimit, prHourlyLimit,
-  //     branchConcurrentLimit and schedule → "skip the line".
-  //   • PRs are created as soon as an alert is detected (prCreation: "immediate"),
-  //     this is prioritizing security over stability.
-  //   • With automerge: true + ignoreTests: true they are merged immediately.
+  //   • Ignore the global "schedule" and PR rate limits: created as
+  //     soon as Renovate runs and sees an alert.
+  //   • Because Renovate is expected to run daily, security PRs can
+  //     appear on any day, even if regular updates are restricted to
+  //     specific days by "schedule".
+  //   • With automerge: true + ignoreTests: true they are merged
+  //     immediately once created.
   //
   // Sources:
   //   • GitHub Security Advisories / Dependabot alerts
@@ -514,7 +363,7 @@
   // ================================================================
   "vulnerabilityAlerts": {
     "enabled": true,              // Enable security vulnerability detection
-    "automerge": true,             // Auto-merge security fix PRs as soon as they appear
+    "automerge": true,            // Auto-merge security fix PRs as soon as they appear
     "labels": ["security", "priority-high"]
   }
 }

@@ -4,6 +4,7 @@
 [![PHP](https://img.shields.io/badge/PHP-7.1%20%7C%207.2%20%7C%207.3%20%7C%207.4%20%7C%208.0%20%7C%208.1%20%7C%208.2%20%7C%208.3%20%7C%208.4%20%7C%208.5-%8892BF.svg?style=flat-square&labelColor=8892BF&logo=php)](https://www.php.net/)
 [![Version](https://img.shields.io/github/v/release/alex2276564/TelegramNotifier?color=blue)](https://github.com/alex2276564/TelegramNotifier/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![SLSA 3](https://slsa.dev/images/gh-badge-level3.svg)](https://slsa.dev)
 
 TelegramNotifier is a powerful PrestaShop module that sends instant notifications about new orders, admin logins, and new customer registrations directly to your Telegram. Stay informed about every sale, monitor your store's security, and keep track of new customers in real-time, right on your smartphone or computer!
 
@@ -130,7 +131,7 @@ After installing TelegramNotifier, you'll enter the module configuration and enc
      - Multiple PrestaShop installations with TelegramNotifier on the same server (sharing the same IP address)
      - Multiple shops sending notifications to the same chat IDs (even with different bot tokens)
 
-     This can help manage Telegram's rate limits when multiple notifications are sent simultaneously. Telegram applies rate limits per chat, not per bot token.
+     This can help manage Telegram's rate limits when multiple notifications are sent simultaneously. Telegram applies multi-layered rate limits per target chat, group/channel, and bot token.
 
 8. **Message Templates:**
    Customize the notification messages using available placeholders:

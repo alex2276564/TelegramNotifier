@@ -1,0 +1,8 @@
+rules:
+  # Turned off because gh-actions-lock does not support reusable workflows yet. We are
+  # waiting for this feature to be implemented in the future before re-enabling this rule.
+  unpinned-uses: off
+
+  # Turned off because explicitly documenting every single permission block
+  # makes the YAML configuration cluttered and harder to read at a glance.
+  undocumented-permissions: off

@@ -4,6 +4,9 @@ rules:
     GHA_THIRD_PARTY_ACTION: "Third-party actions are acceptable for this project."
 
 suppress:
+  - rule: DEAD_DROP_TELEGRAM
+    reason: "Telegram url used only for documentation here."
+    path: .github/ISSUE_TEMPLATE/config.yml
   - rule: WORKFLOW_SECRET_TO_UPLOAD_PATH
     reason: "Secrets are already scoped to the minimum set of steps; outbound calls are limited to trusted endpoints."
     path: .github/workflows/scheduled-security.yml

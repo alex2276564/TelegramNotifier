@@ -52,7 +52,6 @@ jobs:
     timeout-minutes: 20
 
     outputs:
-      zip_file: ${{ steps.zip.outputs.zip_file }}
       zip_name: ${{ steps.zip.outputs.zip_name }}
       sha256: ${{ steps.zip.outputs.sha256 }}
       slsa_subjects: ${{ steps.subjects.outputs.subjects_b64 }}

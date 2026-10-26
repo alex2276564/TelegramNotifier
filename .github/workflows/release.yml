@@ -48,7 +48,7 @@ jobs:
   # ================================================================
   build:
     name: 🏗️ Build module
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
 
     outputs:
@@ -58,7 +58,7 @@ jobs:
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@v2.22.1
+        uses: step-security/harden-runner@v2.22.2
         with:
           egress-policy: audit
 
@@ -224,7 +224,7 @@ jobs:
   release:
     name: 🚀 GitHub Release
     needs: [build, provenance]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
 
     permissions:
@@ -232,7 +232,7 @@ jobs:
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@v2.22.1
+        uses: step-security/harden-runner@v2.22.2
         with:
           egress-policy: audit
 

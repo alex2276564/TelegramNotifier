@@ -123,8 +123,25 @@ The built-in cURL wrapper enforces:
 
 - **Timeouts**: Connection (5s), Total request (10s).
 - **Response size limit**: Hard cap of **256 KiB** to prevent large payloads (uses `CURLOPT_WRITEFUNCTION`).
+- **No implicit redirects**: The wrapper never enables `CURLOPT_FOLLOWLOCATION`, so HTTP 3xx responses are returned as-is and requests are not transparently redirected to unexpected or untrusted endpoints.
 
 ---
+
+## PHP file-level hardening
+
+**Note:** This is defense-in-depth, not a substitute for correct web server configuration. The primary protection against direct access to module internals should be your server/hosting setup (directory listing disabled, `.htaccess` rules enforced, PrestaShop's own front controller routing intact) — the guards below only reduce impact if that configuration is missing or misconfigured.
+
+- **`_PS_VERSION_` guard:** Every PHP file containing business logic starts with:
+
+  ```php
+  if (!defined('_PS_VERSION_')) {
+      exit;
+  }
+  ```
+
+  If a web server misconfiguration allows direct HTTP access to a module file outside of PrestaShop's normal bootstrap, the file exits immediately instead of executing any logic.
+
+- **`index.php` guards:** Every directory shipped with (and created by) the module contains an empty `index.php`. If directory listing is ever accidentally enabled on the web server, requesting the directory serves this blank file instead of listing its contents, preventing enumeration of the module's internal file structure.
 
 ## CI hardening
 

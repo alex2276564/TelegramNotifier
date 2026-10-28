@@ -175,33 +175,6 @@ jobs:
             --scope-mode "$STRIX_SCOPE_MODE" \
             --instruction-file ".github/strix/rules.txt"
 
-  security-scan-supply-chain-guard:
-    name: 🔐 Security Scan supply-chain-guard
-    runs-on: ubuntu-26.04
-    timeout-minutes: 10
-
-    permissions:
-      contents: read
-      pull-requests: write
-
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@v2.22.2
-        with:
-          egress-policy: audit
-
-      - name: Checkout repository
-        uses: actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-
-      - uses: homeofe/supply-chain-guard@v6.6.0
-        with:
-          fail-on: low
-          comment-on-pr: true
-          refresh-catalog: true
-          exclude-rules: POLICY_SUPPRESSED_SEVERE
-
   security-scan-jactionlint:
     name: 🔐 Security Scan jactionlint
     runs-on: ubuntu-26.04

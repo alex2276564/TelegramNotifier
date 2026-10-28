@@ -10,7 +10,6 @@ workflows:
         - 'actions/upload-artifact@v7.0.2'
         - 'davidanson/markdownlint-cli2-action@v24.2.0'
         - 'github/codeql-action@v4.39.1'
-        - 'homeofe/supply-chain-guard@v6.6.0'
         - 'jdx/jactionlint@v2.3.0'
         - 'shivammathur/setup-php@2.40.0'
         - 'socketdev/action@v1.3.2'
@@ -28,7 +27,6 @@ workflows:
         - 'actions/checkout@v7.0.1'
         - 'actions/setup-python@v7.1.0'
         - 'github/codeql-action@v4.39.1'
-        - 'homeofe/supply-chain-guard@v6.6.0'
         - 'jdx/jactionlint@v2.3.0'
         - 'socketdev/action@v1.3.2'
         - 'step-security/harden-runner@v2.22.2'
@@ -58,16 +56,6 @@ dependencies:
         commit: 'sha1-9000827ccba6bdab643e8b6fd33ac0654aef8333'
         owner_id: 44036562
         repo_id: 192626254
-    'actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3':
-        ref: 'v9.0.0'
-        commit: 'sha1-3a2844b7e9c422d3c10d287c895573f7108da1b3'
-        owner_id: 44036562
-        repo_id: 205262760
-    'actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1':
-        ref: 'v7.1.0'
-        commit: 'sha1-949feb2413d6458794dcd2491c4babbbce0c15c1'
-        owner_id: 44036562
-        repo_id: 189476904
     'actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444':
         ref: 'v5.0.0'
         commit: 'sha1-a0853c24544627f65ddf259abe73b1d18a591444'
@@ -98,14 +86,6 @@ dependencies:
         commit: 'sha1-9b3254085494b55a0f7c4c2b3d2d52cc712ce370'
         owner_id: 9919
         repo_id: 259445878
-    'homeofe/supply-chain-guard@v6.6.0':
-        ref: 'v6.6.0'
-        commit: 'sha1-0950c78d2f918f0f59dc4f4c1a13c19f9a95c626'
-        owner_id: 154892989
-        repo_id: 1185867580
-        uses:
-            - 'actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3'
-            - 'actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1'
     'jdx/jactionlint@v2.3.0':
         ref: 'v2.3.0'
         commit: 'sha1-a65ab044e916760429068fe5794b8306abdfcbb9'

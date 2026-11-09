@@ -282,7 +282,7 @@ jobs:
         # zizmor: softprops/action-gh-release is intentionally used over
         # `gh release` CLI — it provides atomic asset upload, glob support,
         # and release update semantics not easily replicated with the CLI.
-        uses: softprops/action-gh-release@v3.0.3 # zizmor: ignore[superfluous-actions]
+        uses: softprops/action-gh-release@v3.0.4 # zizmor: ignore[superfluous-actions]
         with:
           # No automatic "v" prefix: the tag will be exactly what you type
           # in the "release_version" input (e.g. "1.0.9").

@@ -123,7 +123,7 @@ jobs:
             --error
 
       - name: Upload results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v4.39.1
+        uses: github/codeql-action/upload-sarif@v4.39.3
         if: ${{ always() }}
         with:
           sarif_file: semgrep.sarif
@@ -196,7 +196,7 @@ jobs:
           persist-credentials: false
 
       - name: Run jactionlint (pedantic + online + strict exit)
-        uses: jdx/jactionlint@v2.4.0
+        uses: jdx/jactionlint@v2.5.0
         with:
           profile: pedantic
           online: strict

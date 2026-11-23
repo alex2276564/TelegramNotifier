@@ -77,7 +77,7 @@ jobs:
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@v2.22.4
+        uses: step-security/harden-runner@v2.23.0
         with:
           egress-policy: audit
 
@@ -150,7 +150,7 @@ jobs:
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@v2.22.4
+        uses: step-security/harden-runner@v2.23.0
         with:
           egress-policy: audit
 
@@ -186,7 +186,7 @@ jobs:
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@v2.22.4
+        uses: step-security/harden-runner@v2.23.0
         with:
           egress-policy: audit
 
@@ -213,7 +213,7 @@ jobs:
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@v2.22.4
+        uses: step-security/harden-runner@v2.23.0
         with:
           egress-policy: audit
 
